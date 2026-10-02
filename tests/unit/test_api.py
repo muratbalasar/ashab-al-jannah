@@ -22,14 +22,14 @@ def create_member(client: TestClient, name="Jan Jansen", email="jan@example.nl")
     return response.json()
 
 
-def create_donation(client: TestClient, member_id: int, amount="50.00", **extra) -> dict:
+def create_donation(client: TestClient, member_id: int, amount="50.00", headers=None, **extra):
     body = {
         "member_id": member_id,
         "subcategory_id": sub_id(client, "Sponsoring", "MKB"),
         "amount": amount,
         **extra,
     }
-    return client.post("/api/v1/donations", json=body)
+    return client.post("/api/v1/donations", json=body, headers=headers)
 
 
 def test_health_is_public(settings, database) -> None:
@@ -101,11 +101,12 @@ def test_invalid_donation_is_not_stored(client, member_id, amount, expected) -> 
     assert client.get("/api/v1/donations").json() == []
 
 
-def test_beheerder_cannot_register_donations(client) -> None:
+def test_beheerder_can_do_everything(client) -> None:
     member = create_member(client)
-    body = {"member_id": member["id"], "subcategory_id": 1, "amount": "5"}
 
-    assert client.post("/api/v1/donations", json=body, headers=BEHEERDER).status_code == 403
+    assert create_donation(client, member["id"], headers=BEHEERDER).status_code == 201
+    assert client.post("/api/v1/insights", json={}, headers=BEHEERDER).status_code == 200
+    assert client.get("/api/v1/reports/export.csv", headers=BEHEERDER).status_code == 200
 
 
 def test_report_hides_member_details_for_bestuurder(client) -> None:
@@ -165,20 +166,84 @@ def test_insight_endpoint(client) -> None:
     insight = client.post("/api/v1/insights", json={}, headers=BESTUURDER).json()
 
     assert insight["provider"] == "lokaal" and "€ 50,00" in insight["text"]
-    assert client.post("/api/v1/insights", json={}, headers=BEHEERDER).status_code == 403
 
 
 def test_categories_management(client) -> None:
-    created = client.post("/api/v1/categories", json={"name": "Evenementen"})
+    created = client.post("/api/v1/categories", json={"name": "Evenementen"}, headers=BEHEERDER)
     assert created.status_code == 201
+    category_id = created.json()["id"]
     sub = client.post(
-        f"/api/v1/categories/{created.json()['id']}/subcategories", json={"name": "Iftar"}
+        f"/api/v1/categories/{category_id}/subcategories",
+        json={"name": "Iftar"},
+        headers=BEHEERDER,
     )
     assert sub.status_code == 201
     assert client.post("/api/v1/categories", json={"name": "Evenementen"}).status_code == 409
-    assert (
-        client.post("/api/v1/categories", json={"name": "X"}, headers=BESTUURDER).status_code == 403
+    for role in ("bestuurder", "penningmeester"):
+        response = client.post(
+            "/api/v1/categories", json={"name": "X"}, headers={"X-Dev-Roles": role}
+        )
+        assert response.status_code == 403, role
+
+
+def test_update_category_and_subcategory(client) -> None:
+    category_id = client.post("/api/v1/categories", json={"name": "Evenementen"}).json()["id"]
+    sub_url = f"/api/v1/categories/{category_id}/subcategories"
+    sub_id_ = client.post(sub_url, json={"name": "Iftar"}).json()["id"]
+
+    renamed = client.patch(
+        f"/api/v1/categories/{category_id}", json={"name": "Activiteiten"}, headers=BEHEERDER
     )
+    assert renamed.json()["name"] == "Activiteiten"
+    assert renamed.json()["is_active"] is True
+    sub = client.patch(f"{sub_url}/{sub_id_}", json={"name": "Iftar 2026", "is_active": False})
+    assert sub.json() == {"id": sub_id_, "name": "Iftar 2026", "is_active": False}
+
+    deactivated = client.patch(f"/api/v1/categories/{category_id}", json={"is_active": False})
+    assert deactivated.json()["name"] == "Activiteiten"
+    names = [c["name"] for c in client.get("/api/v1/categories").json()]
+    assert "Activiteiten" not in names
+    all_names = [c["name"] for c in client.get("/api/v1/categories?include_inactive=true").json()]
+    assert "Activiteiten" in all_names
+
+
+def test_update_category_errors(client) -> None:
+    contributie_sub = sub_id(client, "Contributie", "Jaarlijks")
+    sponsoring = next(
+        c for c in client.get("/api/v1/categories").json() if c["name"] == "Sponsoring"
+    )
+
+    assert (
+        client.patch(f"/api/v1/categories/{sponsoring['id']}", json={"name": "Donatie"}).status_code
+        == 409
+    )
+    assert (
+        client.patch(f"/api/v1/categories/{sponsoring['id']}", json={"name": ""}).status_code == 422
+    )
+    assert client.patch("/api/v1/categories/999", json={"is_active": False}).status_code == 404
+    wrong_parent = f"/api/v1/categories/{sponsoring['id']}/subcategories/{contributie_sub}"
+    assert client.patch(wrong_parent, json={"is_active": False}).status_code == 404
+    assert (
+        client.patch(
+            f"/api/v1/categories/{sponsoring['id']}",
+            json={"is_active": False},
+            headers={"X-Dev-Roles": "penningmeester"},
+        ).status_code
+        == 403
+    )
+
+
+def test_inactive_subcategory_rejects_new_donations(client) -> None:
+    member = create_member(client)
+    sponsoring = next(
+        c for c in client.get("/api/v1/categories").json() if c["name"] == "Sponsoring"
+    )
+    mkb = sub_id(client, "Sponsoring", "MKB")
+    client.patch(
+        f"/api/v1/categories/{sponsoring['id']}/subcategories/{mkb}", json={"is_active": False}
+    )
+
+    assert create_donation(client, member["id"]).status_code == 422
 
 
 @pytest.fixture

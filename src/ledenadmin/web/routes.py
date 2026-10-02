@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import date, datetime
 from typing import Annotated, Any
 from urllib.parse import urlencode
@@ -10,10 +10,12 @@ from pydantic import ValidationError
 from ledenadmin.api.deps import CurrentPrincipal, Services, require
 from ledenadmin.auth.principal import Principal
 from ledenadmin.domain.enums import MemberStatus, Permission
-from ledenadmin.domain.errors import DomainError
+from ledenadmin.domain.errors import ConflictError, DomainError
+from ledenadmin.schemas.categories import CategoryCreate
 from ledenadmin.schemas.donations import DonationCreate, DonationRead
 from ledenadmin.schemas.members import MemberCreate, MemberUpdate
 from ledenadmin.schemas.reports import Report, ReportFilter
+from ledenadmin.web.dates import nl_date_to_iso, nl_datetime_to_iso
 from ledenadmin.web.security import verify_csrf
 
 router = APIRouter(dependencies=[Depends(verify_csrf)], include_in_schema=False)
@@ -22,7 +24,11 @@ MESSAGES = {
     "lid-aangemaakt": "Het lid is aangemaakt.",
     "lid-bijgewerkt": "Het lid is bijgewerkt.",
     "donatie-geregistreerd": "De donatie is geregistreerd.",
+    "categorie-opgeslagen": "De categorie is opgeslagen.",
+    "subcategorie-opgeslagen": "De subcategorie is opgeslagen.",
 }
+
+CATEGORY_NAME_ERROR = "Vul een naam in (maximaal 100 tekens)."
 
 FIELD_MESSAGES = {
     "name": "Vul een naam in (maximaal 200 tekens).",
@@ -31,14 +37,15 @@ FIELD_MESSAGES = {
     "member_id": "Kies een lid.",
     "subcategory_id": "Kies een categorie en subcategorie.",
     "amount": "Vul een bedrag groter dan 0 in, met maximaal 2 decimalen.",
-    "donated_at": "Vul een geldige datum en tijd in.",
+    "donated_at": "Vul een geldige datum en tijd in (dd-mm-jjjj uu:mm).",
     "description": "De omschrijving mag maximaal 500 tekens bevatten.",
-    "start_date": "Vul een geldige begindatum in.",
-    "end_date": "Vul een geldige einddatum in.",
+    "start_date": "Vul een geldige begindatum in (dd-mm-jjjj).",
+    "end_date": "Vul een geldige einddatum in (dd-mm-jjjj).",
 }
 
 FILTER_FIELDS = ("start_date", "end_date", "member_id", "category_id", "subcategory_id")
 FormText = Annotated[str, Form()]
+FormBool = Annotated[bool, Form()]
 
 
 def _perm(permission: Permission):
@@ -99,6 +106,9 @@ def today(request: Request) -> date:
 
 def parse_filter(values: Mapping[str, Any]) -> tuple[ReportFilter | None, dict[str, str]]:
     data = {k: v for k, v in clean(values).items() if k in FILTER_FIELDS}
+    for field in ("start_date", "end_date"):
+        if field in data:
+            data[field] = nl_date_to_iso(data[field])
     try:
         return ReportFilter.model_validate(data), {}
     except ValidationError as exc:
@@ -279,6 +289,8 @@ def donation_create(
     data = clean(values)
     if "amount" in data:
         data["amount"] = parse_amount(data["amount"])
+    if "donated_at" in data:
+        data["donated_at"] = nl_datetime_to_iso(data["donated_at"])
     try:
         services.donations.register(DonationCreate.model_validate(data), principal.name)
     except ValidationError as exc:
@@ -286,6 +298,162 @@ def donation_create(
     except DomainError as exc:
         return _donation_form(request, services, values, domain_errors(exc), 422)
     return RedirectResponse("/donaties?melding=donatie-geregistreerd", status_code=303)
+
+
+# ── Categorieën ──────────────────────────────────────────────────────────────
+# Met HTMX wordt alleen het beheerblok vervangen (scrollpositie blijft behouden);
+# zonder JavaScript werken dezelfde formulieren via redirects.
+
+CanManageCategories = _perm(Permission.CATEGORIES_WRITE)
+
+
+def _categories_page(
+    request: Request,
+    services: Services,
+    editing: str = "",
+    values: dict[str, str] | None = None,
+    errors: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    """`editing` is de sleutel van het geopende formulier; `values`/`errors` horen daarbij."""
+    context = {
+        "categories": services.categories.list(include_inactive=True),
+        "editing": editing,
+        "values": values or {},
+        "errors": errors or {},
+    }
+    template = "categories/_beheer.html" if is_partial(request) else "categories/index.html"
+    return render(request, template, context, status_code)
+
+
+def _saved(request: Request, services: Services, category_id: int, message: str) -> Response:
+    if is_partial(request):
+        return _categories_page(request, services)
+    url = f"/categorieen?melding={message}#categorie-{category_id}"
+    return RedirectResponse(url, status_code=303)
+
+
+def _save_name(
+    request: Request,
+    services: Services,
+    editing: str,
+    name: str,
+    save: Callable[[str], int],
+    message: str,
+) -> Response:
+    """Valideert en bewaart een (sub)categorienaam; `save` geeft de categorie-ID terug."""
+    values = {"name": name}
+    try:
+        category_id = save(CategoryCreate.model_validate(values).name)
+    except ValidationError:
+        errors = {"name": CATEGORY_NAME_ERROR}
+        return _categories_page(request, services, editing, values, errors, 422)
+    except ConflictError as exc:
+        return _categories_page(request, services, editing, values, domain_errors(exc), 409)
+    return _saved(request, services, category_id, message)
+
+
+@router.get("/categorieen")
+def categories_index(
+    request: Request, services: Services, _: CanManageCategories, bewerk: str = ""
+) -> Response:
+    return _categories_page(request, services, editing=bewerk)
+
+
+@router.post("/categorieen")
+def category_create(
+    request: Request, services: Services, _: CanManageCategories, name: FormText = ""
+) -> Response:
+    return _save_name(
+        request,
+        services,
+        "nieuwe-categorie",
+        name,
+        lambda value: services.categories.create_category(value).id,
+        "categorie-opgeslagen",
+    )
+
+
+@router.post("/categorieen/{category_id}")
+def category_rename(
+    request: Request,
+    category_id: int,
+    services: Services,
+    _: CanManageCategories,
+    name: FormText = "",
+) -> Response:
+    return _save_name(
+        request,
+        services,
+        f"cat-{category_id}",
+        name,
+        lambda value: services.categories.update_category(category_id, name=value).id,
+        "categorie-opgeslagen",
+    )
+
+
+@router.post("/categorieen/{category_id}/status")
+def category_set_status(
+    request: Request,
+    category_id: int,
+    services: Services,
+    _: CanManageCategories,
+    is_active: FormBool,
+) -> Response:
+    services.categories.update_category(category_id, is_active=is_active)
+    return _saved(request, services, category_id, "categorie-opgeslagen")
+
+
+@router.post("/categorieen/{category_id}/subcategorieen")
+def subcategory_create(
+    request: Request,
+    category_id: int,
+    services: Services,
+    _: CanManageCategories,
+    name: FormText = "",
+) -> Response:
+    return _save_name(
+        request,
+        services,
+        f"nieuw-{category_id}",
+        name,
+        lambda value: services.categories.create_subcategory(category_id, value).category_id,
+        "subcategorie-opgeslagen",
+    )
+
+
+@router.post("/categorieen/{category_id}/subcategorieen/{subcategory_id}")
+def subcategory_rename(
+    request: Request,
+    category_id: int,
+    subcategory_id: int,
+    services: Services,
+    _: CanManageCategories,
+    name: FormText = "",
+) -> Response:
+    return _save_name(
+        request,
+        services,
+        f"sub-{subcategory_id}",
+        name,
+        lambda value: services.categories.update_subcategory(
+            category_id, subcategory_id, name=value
+        ).category_id,
+        "subcategorie-opgeslagen",
+    )
+
+
+@router.post("/categorieen/{category_id}/subcategorieen/{subcategory_id}/status")
+def subcategory_set_status(
+    request: Request,
+    category_id: int,
+    subcategory_id: int,
+    services: Services,
+    _: CanManageCategories,
+    is_active: FormBool,
+) -> Response:
+    services.categories.update_subcategory(category_id, subcategory_id, is_active=is_active)
+    return _saved(request, services, category_id, "subcategorie-opgeslagen")
 
 
 # ── Rapportage ───────────────────────────────────────────────────────────────

@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "attributesToSettle": ["class", "width", "height"]}'>
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "attributesToSettle": ["class", "width", "height"], "responseHandling": [{"code": "204", "swap": false}, {"code": "[23]..", "swap": true}, {"code": "409|422", "swap": true, "error": false}, {"code": "[45]..", "swap": false, "error": true}]}'>
   <title>{% block title %}{{ app_name }} – {{ app_tagline }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='vendor/pico.min.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
-  <script src="{{ url_for('static', path='vendor/htmx.min.js') }}" defer></script>
-  <script src="{{ url_for('static', path='vendor/chart.umd.min.js') }}" defer></script>
-  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', path='vendor/pico.min.css') }}?v={{ asset_version('vendor/pico.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}?v={{ asset_version('app.css') }}">
+  <script src="{{ url_for('static', path='vendor/htmx.min.js') }}?v={{ asset_version('vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='vendor/chart.umd.min.js') }}?v={{ asset_version('vendor/chart.umd.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}?v={{ asset_version('app.js') }}" defer></script>
 </head>
 <body hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
   <a class="skip-link" href="#inhoud">Naar inhoud</a>
@@ -29,6 +29,7 @@
         {% if principal.can(Permission.MEMBERS_READ) %}<li><a href="/leden">Leden</a></li>{% endif %}
         {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="/donaties">Donaties</a></li>{% endif %}
         {% if principal.can(Permission.REPORTS_READ) %}<li><a href="/rapportage">Rapportage</a></li>{% endif %}
+        {% if principal.can(Permission.CATEGORIES_WRITE) %}<li><a href="/categorieen">Categorieën</a></li>{% endif %}
         <li><small title="Aangemeld als">{{ principal.name }}</small></li>
       </ul>
       {% endif %}

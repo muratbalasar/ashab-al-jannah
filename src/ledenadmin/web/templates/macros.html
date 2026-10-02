@@ -13,3 +13,27 @@
 {% macro csrf(token) -%}
   <input type="hidden" name="csrf_token" value="{{ token }}">
 {%- endmacro %}
+
+{#- Datumveld in Nederlandse notatie. De knop opent de kalender van de browser via een
+    verborgen hulpveld (app.js); zonder JavaScript kun je de datum gewoon typen. -#}
+{% macro date_field(name, label, value, errors, with_time=False, required=False) -%}
+{% set placeholder = "dd-mm-jjjj uu:mm" if with_time else "dd-mm-jjjj" %}
+<div class="date-field">
+  <label for="{{ name }}">{{ label }}</label>
+  <div role="group">
+    <input id="{{ name }}" name="{{ name }}" type="text" inputmode="numeric" autocomplete="off"
+           placeholder="{{ placeholder }}" title="Notatie: {{ placeholder }}" data-date-text
+           value="{{ (value | nl_datetime) if with_time else (value | nl_date) }}"
+           {% if required %}required{% endif %} {{ invalid(errors, name) }}>
+    <button type="button" class="secondary outline date-picker-button" data-date-picker
+            aria-label="{{ label }} kiezen uit kalender" title="Kies uit kalender">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+      </svg>
+    </button>
+  </div>
+  <input type="{{ 'datetime-local' if with_time else 'date' }}" class="date-proxy" tabindex="-1" aria-hidden="true">
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}

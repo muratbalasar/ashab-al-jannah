@@ -1,0 +1,77 @@
+{% from "macros.html" import field_error, invalid, csrf %}
+{#- Sleutels: "nieuwe-categorie", "cat-<id>", "sub-<id>", "nieuw-<categorie-id>" (nieuwe subcategorie). -#}
+{% set state = {"editing": editing, "form_values": values, "form_errors": errors, "token": csrf_token} %}
+
+{% macro name_form(state, key, action, current, label, submit_label, autofocus) -%}
+{% set own_errors = state.form_errors if state.editing == key else {} %}
+{% set value = state.form_values.get('name', current) if state.editing == key else current %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" class="edit-form" data-once novalidate>
+  {{ csrf(state.token) }}
+  <fieldset role="group">
+    <input id="{{ key }}-naam" name="name" type="text" required maxlength="100" autocomplete="off"
+           aria-label="{{ label }}" placeholder="{{ label }}" value="{{ value }}"
+           {% if autofocus %}autofocus{% endif %} {{ invalid(own_errors, 'name') }}>
+    <button type="submit">{{ submit_label }}</button>
+  </fieldset>
+  {{ field_error(own_errors, 'name') }}
+</form>
+{%- endmacro %}
+
+{% macro cancel_link(anchor) -%}
+<a href="/categorieen#{{ anchor }}" hx-get="/categorieen" class="link-action muted">Annuleren</a>
+{%- endmacro %}
+
+{% macro row(state, key, name, is_active, action, label, anchor, tag) -%}
+<div class="cat-row">
+{% if state.editing == key %}
+  {{ name_form(state, key, action, name, label, "Opslaan", True) }}
+  {{ cancel_link(anchor) }}
+{% else %}
+  <{{ tag }} class="cat-name">{{ name }}{% if not is_active %} <span class="inactive-tag">inactief</span>{% endif %}</{{ tag }}>
+  <div class="row-actions">
+    <a id="wijzig-{{ key }}" class="link-action" href="/categorieen?bewerk={{ key }}#{{ anchor }}"
+       hx-get="/categorieen?bewerk={{ key }}" aria-label="{{ name }} wijzigen">Wijzigen</a>
+    <form method="post" action="{{ action }}/status" hx-post="{{ action }}/status" data-once>
+      {{ csrf(state.token) }}
+      <input type="hidden" name="is_active" value="{{ 'false' if is_active else 'true' }}">
+      <button id="status-{{ key }}" type="submit" class="link-action{% if is_active %} muted{% endif %}"
+              aria-label="{{ name }} {{ 'deactiveren' if is_active else 'activeren' }}">{{ 'Deactiveren' if is_active else 'Activeren' }}</button>
+    </form>
+  </div>
+{% endif %}
+</div>
+{%- endmacro %}
+
+<div id="categorie-beheer" hx-target="#categorie-beheer" hx-swap="outerHTML">
+  <div class="new-category">
+    {{ name_form(state, "nieuwe-categorie", "/categorieen", "", "Nieuwe categorie", "Toevoegen", editing == "nieuwe-categorie") }}
+  </div>
+
+  {% for c in categories %}
+  {% set anchor = "categorie-" ~ c.id %}
+  {% set base = "/categorieen/" ~ c.id %}
+  <article id="{{ anchor }}" class="cat-card{% if not c.is_active %} is-inactive{% endif %}">
+    {{ row(state, "cat-" ~ c.id, c.name, c.is_active, base, "Naam van de categorie", anchor, "h2") }}
+    <ul class="cat-list">
+      {% for s in c.subcategories %}
+      <li{% if not s.is_active %} class="is-inactive"{% endif %}>
+        {{ row(state, "sub-" ~ s.id, s.name, s.is_active, base ~ "/subcategorieen/" ~ s.id, "Naam van de subcategorie", anchor, "span") }}
+      </li>
+      {% endfor %}
+      <li class="add-row">
+        {% if editing == "nieuw-" ~ c.id %}
+        <div class="cat-row">
+          {{ name_form(state, "nieuw-" ~ c.id, base ~ "/subcategorieen", "", "Nieuwe subcategorie", "Toevoegen", True) }}
+          {{ cancel_link(anchor) }}
+        </div>
+        {% else %}
+        <a id="toevoegen-{{ c.id }}" class="link-action" href="/categorieen?bewerk=nieuw-{{ c.id }}#{{ anchor }}"
+           hx-get="/categorieen?bewerk=nieuw-{{ c.id }}">+ Subcategorie toevoegen</a>
+        {% endif %}
+      </li>
+    </ul>
+  </article>
+  {% else %}
+  <p class="empty">Er zijn nog geen categorieën.</p>
+  {% endfor %}
+</div>

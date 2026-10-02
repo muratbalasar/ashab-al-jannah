@@ -8,8 +8,10 @@ from ledenadmin.domain.enums import Permission
 from ledenadmin.schemas.categories import (
     CategoryCreate,
     CategoryRead,
+    CategoryUpdate,
     SubcategoryCreate,
     SubcategoryRead,
+    SubcategoryUpdate,
 )
 
 router = APIRouter(prefix="/categories", tags=["categorieën"])
@@ -39,4 +41,26 @@ def create_subcategory(
     category_id: int, data: SubcategoryCreate, services: Services, _: CanWrite
 ) -> SubcategoryRead:
     subcategory = services.categories.create_subcategory(category_id, data.name)
+    return SubcategoryRead.model_validate(subcategory)
+
+
+@router.patch("/{category_id}", response_model=CategoryRead)
+def update_category(
+    category_id: int, data: CategoryUpdate, services: Services, _: CanWrite
+) -> CategoryRead:
+    category = services.categories.update_category(category_id, data.name, data.is_active)
+    return CategoryRead.model_validate(category)
+
+
+@router.patch("/{category_id}/subcategories/{subcategory_id}", response_model=SubcategoryRead)
+def update_subcategory(
+    category_id: int,
+    subcategory_id: int,
+    data: SubcategoryUpdate,
+    services: Services,
+    _: CanWrite,
+) -> SubcategoryRead:
+    subcategory = services.categories.update_subcategory(
+        category_id, subcategory_id, data.name, data.is_active
+    )
     return SubcategoryRead.model_validate(subcategory)

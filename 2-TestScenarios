@@ -100,9 +100,14 @@ Feature: Gegevens veilig beheren (US08) – tests/functional/06_autorisatie.robo
     When de bestuurder de ledenlijst opvraagt
     Then wordt de toegang geweigerd
 
-  Scenario: Beheerder kan geen donaties registreren
-    When de beheerder een donatie probeert te registreren
+  Scenario: Penningmeester kan geen categorieën beheren
+    When de penningmeester een categorie probeert aan te maken
     Then wordt de toegang geweigerd
+
+  Scenario: Beheerder mag alles
+    When de beheerder een donatie registreert
+    Then is de donatie opgeslagen
+    And kan de beheerder de CSV-export downloaden
 
   Scenario: Wijzigingen via de web-UI vereisen een CSRF-token
     When een formulier zonder CSRF-token wordt verstuurd

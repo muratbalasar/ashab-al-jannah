@@ -3,22 +3,14 @@ from dataclasses import dataclass
 from ledenadmin.domain.enums import Permission, Role
 
 # Startpunt voor de rolverdeling; definitieve rechten worden met het bestuur afgestemd.
+# De beheerder krijgt alle rechten, ook rechten die later aan Permission worden toegevoegd.
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
-    Role.BEHEERDER: frozenset(
-        {
-            Permission.MEMBERS_READ,
-            Permission.MEMBERS_WRITE,
-            Permission.DONATIONS_READ,
-            Permission.REPORTS_READ,
-            Permission.REPORTS_MEMBER_READ,
-        }
-    ),
+    Role.BEHEERDER: frozenset(Permission),
     Role.PENNINGMEESTER: frozenset(
         {
             Permission.MEMBERS_READ,
             Permission.DONATIONS_READ,
             Permission.DONATIONS_WRITE,
-            Permission.CATEGORIES_WRITE,
             Permission.REPORTS_READ,
             Permission.REPORTS_MEMBER_READ,
             Permission.INSIGHTS_READ,

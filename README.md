@@ -8,7 +8,7 @@ uitbreidingspunten.
 
 | Document | Inhoud |
 |---|---|
-| [1-UserStories](./1-UserStories) | User stories en acceptatiecriteria (US01–US10) |
+| [1-UserStories](./1-UserStories.md) | User stories en acceptatiecriteria (US01–US10) |
 | [2-TestScenarios](./2-TestScenarios) | Gherkin-scenario's, 1-op-1 geautomatiseerd in [tests/functional](./tests/functional) |
 | [.env.example](./.env.example) | Alle configuratie-instellingen |
 
@@ -98,13 +98,15 @@ Principes:
 | Leden inzien | ✔ | ✔ | |
 | Leden aanmaken/wijzigen | ✔ | | |
 | Donaties inzien | ✔ | ✔ | |
-| Donaties registreren, categorieën beheren | | ✔ | |
+| Donaties registreren | ✔ | ✔ | |
+| Categorieën en subcategorieën beheren | ✔ | | |
 | Rapportage (totalen, grafieken) | ✔ | ✔ | ✔ |
 | Rapportage per lid / met namen | ✔ | ✔ | |
-| AI-analyse | | ✔ | ✔ |
-| CSV-export | | ✔ | |
+| AI-analyse | ✔ | ✔ | ✔ |
+| CSV-export | ✔ | ✔ | |
 
-De rechten staan centraal in [principal.py](./src/ledenadmin/auth/principal.py) en worden
+De beheerder heeft alle rechten, ook rechten die later worden toegevoegd. De rechten staan
+centraal in [principal.py](./src/ledenadmin/auth/principal.py) en worden
 server-side afgedwongen. De UI toont alleen toegestane acties. Een bestuurder krijgt
 rapporten zonder uitsplitsing per lid en zonder losse donaties. Deze verdeling is een
 startpunt dat met het bestuur moet worden bevestigd.
@@ -128,7 +130,18 @@ startpunt dat met het bestuur moet worden bevestigd.
 - Nieuwe donaties voor inactieve leden worden standaard geweigerd. Instelbaar met
   `ALLOW_DONATIONS_FOR_INACTIVE_MEMBERS`.
 - Standaardcategorieën: Contributie (Jaarlijks, Maandelijks), Donatie (Algemeen, Project)
-  en Sponsoring (MKB, Particulier). Uitbreiden kan via `POST /api/v1/categories`.
+  en Sponsoring (MKB, Particulier).
+
+### Categorieën beheren
+
+- Alleen de beheerder beheert categorieën en subcategorieën via de pagina **Categorieën**
+  (`/categorieen`) of de API (`POST`/`PATCH /api/v1/categories`, en
+  `/api/v1/categories/{id}/subcategories[/{sub_id}]`).
+- Aanmaken, hernoemen en (de)activeren. Namen zijn uniek (subcategorieën binnen hun
+  categorie), maximaal 100 tekens.
+- Verwijderen kan niet: bestaande donaties blijven aan hun (sub)categorie gekoppeld.
+  Een inactieve categorie of subcategorie blijft zichtbaar in rapportages, maar is niet
+  te kiezen bij nieuwe donaties. Een hernoeming geldt ook voor bestaande donaties.
 
 ### Rapportage (US04–US06)
 
@@ -249,8 +262,7 @@ gratis tegoeden.
 - **Bankafschriften (US10)**: begin bij voorkeur met CAMT.053- of CSV-exports van de bank
   (betrouwbaarder dan PDF); pdfplumber kan als fallback. AI mag matches voorstellen,
   maar definitief koppelen gebeurt altijd na menselijke bevestiging.
-- Donaties corrigeren of crediteren met een audittrail, beheer van categorieën in de UI
-  en geautomatiseerde browsertests.
+- Donaties corrigeren of crediteren met een audittrail en geautomatiseerde browsertests.
 
 ## Open besluiten
 

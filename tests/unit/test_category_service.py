@@ -37,3 +37,46 @@ def test_unknown_category_raises_not_found(session) -> None:
         CategoryService(session).create_subcategory(999, "X")
     with pytest.raises(NotFoundError):
         CategoryService(session).get_subcategory(999)
+
+
+def test_rename_and_deactivate(session) -> None:
+    service = CategoryService(session)
+    donatie = next(c for c in service.list() if c.name == "Donatie")
+    project = next(s for s in donatie.subcategories if s.name == "Project")
+
+    service.update_category(donatie.id, name="Giften")
+    service.update_subcategory(donatie.id, project.id, name="Bouwproject", is_active=False)
+    service.update_category(donatie.id, is_active=False)
+
+    assert "Giften" not in {c.name for c in service.list()}
+    giften = next(c for c in service.list(include_inactive=True) if c.name == "Giften")
+    assert not giften.is_active
+    assert {(s.name, s.is_active) for s in giften.subcategories} == {
+        ("Algemeen", True),
+        ("Bouwproject", False),
+    }
+
+
+def test_rename_to_own_name_is_allowed(session) -> None:
+    service = CategoryService(session)
+    sponsoring = next(c for c in service.list() if c.name == "Sponsoring")
+    mkb = next(s for s in sponsoring.subcategories if s.name == "MKB")
+
+    assert service.update_category(sponsoring.id, name="Sponsoring").name == "Sponsoring"
+    assert service.update_subcategory(sponsoring.id, mkb.id, name="MKB").name == "MKB"
+
+
+def test_rename_conflicts_and_wrong_parent(session) -> None:
+    service = CategoryService(session)
+    by_name = {c.name: c for c in service.list()}
+    sponsoring, contributie = by_name["Sponsoring"], by_name["Contributie"]
+    mkb = next(s for s in sponsoring.subcategories if s.name == "MKB")
+
+    with pytest.raises(ConflictError):
+        service.update_category(sponsoring.id, name="Contributie")
+    with pytest.raises(ConflictError):
+        service.update_subcategory(sponsoring.id, mkb.id, name="Particulier")
+    with pytest.raises(NotFoundError):
+        service.update_subcategory(contributie.id, mkb.id, is_active=False)
+    with pytest.raises(NotFoundError):
+        service.update_category(999, is_active=False)
