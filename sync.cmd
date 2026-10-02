@@ -20,7 +20,6 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
     "$commitOutput = git commit -m '%COMMIT_MSG%' 2>&1; " ^
     "if ($LASTEXITCODE -eq 0) { Write-Host $commitOutput } else { Write-Host 'Niets te committen, ga verder met pull/push.' }; " ^
     "git remote set-url origin \"https://muratbalasar:$token@github.com/muratbalasar/ashab-al-jannah.git\"; " ^
-    "$pullOutput = git pull 2>&1; Write-Host $pullOutput; " ^
     "$pushOutput = git push 2>&1; Write-Host $pushOutput; " ^
     "git remote set-url origin 'https://github.com/muratbalasar/ashab-al-jannah.git'; " ^
     "exit 0"
