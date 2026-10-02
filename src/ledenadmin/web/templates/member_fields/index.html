@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "macros.html" import field_error, invalid, csrf %}
+{% block title %}Ledenvelden – {{ app_name }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>Ledenvelden</h1>
+  <p>Extra velden die bij elk lid worden getoond, bijvoorbeeld een telefoonnummer of nieuwsbrief.</p>
+</hgroup>
+
+<article>
+  <h2>Nieuw veld</h2>
+  <form method="post" action="/ledenvelden" novalidate>
+    {{ csrf(csrf_token) }}
+    <div class="grid">
+      <label for="label">Naam
+        <input id="label" name="label" type="text" required maxlength="100" autocomplete="off"
+               placeholder="Bijv. Telefoon of Nieuwsbrief" value="{{ values.get('label', '') }}" {{ invalid(errors, 'label') }}>
+        {{ field_error(errors, 'label') }}
+      </label>
+      <label for="field_type">Type
+        <select id="field_type" name="field_type" {{ invalid(errors, 'field_type') }}>
+          {% for value, text in type_labels.items() %}
+          <option value="{{ value }}" {% if values.get('field_type') == value %}selected{% endif %}>{{ text }}</option>
+          {% endfor %}
+        </select>
+        {{ field_error(errors, 'field_type') }}
+      </label>
+      <div class="filter-actions"><button type="submit">Veld toevoegen</button></div>
+    </div>
+    <small>Gevoelige gegevens zoals BSN, ID-bewijs, gezondheid of geloof mogen niet worden vastgelegd (AVG) en worden geweigerd.</small>
+  </form>
+</article>
+
+{% if fields %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th scope="col">Naam</th><th scope="col">Type</th><th scope="col">Status</th><th scope="col">Acties</th></tr></thead>
+    <tbody>
+      {% for f in fields %}
+      <tr>
+        <td>{{ f.label }}</td>
+        <td>{{ type_labels.get(f.field_type, f.field_type) }}</td>
+        <td><span class="badge {{ 'actief' if f.is_active else 'inactief' }}">{{ 'Actief' if f.is_active else 'Inactief' }}</span></td>
+        <td class="row-actions">
+          <form method="post" action="/ledenvelden/{{ f.id }}/status">
+            {{ csrf(csrf_token) }}
+            <input type="hidden" name="is_active" value="{{ 'false' if f.is_active else 'true' }}">
+            <button type="submit" class="link-action">{{ 'Deactiveren' if f.is_active else 'Activeren' }}</button>
+          </form>
+          <form method="post" action="/ledenvelden/{{ f.id }}/verwijderen" data-confirm="Veld '{{ f.label }}' en alle ingevulde waarden verwijderen?">
+            {{ csrf(csrf_token) }}
+            <button type="submit" class="link-action danger">Verwijderen</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p><small>Inactieve velden zijn verborgen op het ledenformulier; de ingevulde waarden blijven bewaard.</small></p>
+{% else %}
+<p class="empty">Nog geen extra velden.</p>
+{% endif %}
+{% endblock %}

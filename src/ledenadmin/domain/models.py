@@ -104,6 +104,29 @@ class Donation(TimestampMixin, Base):
         return self.subcategory.category
 
 
+class MemberField(Base):
+    """Door de beheerder gedefinieerd extra veld voor leden (bijv. telefoon of nieuwsbrief)."""
+
+    __tablename__ = "member_fields"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    label: Mapped[str] = mapped_column(Unicode(100), nullable=False, unique=True)
+    field_type: Mapped[str] = mapped_column(Unicode(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class MemberFieldValue(Base):
+    __tablename__ = "member_field_values"
+
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("members.id", ondelete="CASCADE"), primary_key=True
+    )
+    field_id: Mapped[int] = mapped_column(
+        ForeignKey("member_fields.id", ondelete="CASCADE"), primary_key=True, index=True
+    )
+    value: Mapped[str] = mapped_column(Unicode(500), nullable=False)
+
+
 class AuditLog(Base):
     """Logboek van alle gebruikersacties (aanmelden, bekijken, klikken, wijzigen, verwijderen)."""
 
