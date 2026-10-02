@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import field_error, invalid %}
+{% from "macros.html" import field_error, invalid, date_field %}
 {% block title %}Rapportage – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Rapportage</h1>
@@ -7,12 +7,8 @@
 <form id="report-filter" action="/rapportage" method="get"
       hx-get="/rapportage" hx-target="#rapport" hx-push-url="true" hx-trigger="change, submit">
   <div class="grid">
-    <label for="start_date">Van
-      <input id="start_date" name="start_date" type="date" value="{{ values.get('start_date', '') }}" {{ invalid(errors, 'start_date') }}>
-    </label>
-    <label for="end_date">Tot en met
-      <input id="end_date" name="end_date" type="date" value="{{ values.get('end_date', '') }}" {{ invalid(errors, 'end_date') }}>
-    </label>
+    {{ date_field("start_date", "Van", values.get('start_date', ''), errors) }}
+    {{ date_field("end_date", "Tot en met", values.get('end_date', ''), errors) }}
   </div>
   <div class="grid">
     {% if principal.can(Permission.REPORTS_MEMBER_READ) %}

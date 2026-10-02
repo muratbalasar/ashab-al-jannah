@@ -16,9 +16,14 @@ Bestuurder heeft geen toegang tot de ledenadministratie
     When de bestuurder de ledenlijst opvraagt
     Then wordt de toegang geweigerd
 
-Beheerder kan geen donaties registreren
-    When de beheerder een donatie probeert te registreren
+Penningmeester kan geen categorieën beheren
+    When de penningmeester een categorie probeert aan te maken
     Then wordt de toegang geweigerd
+
+Beheerder mag alles
+    When de beheerder een donatie registreert
+    Then is de donatie opgeslagen
+    And kan de beheerder de CSV-export downloaden
 
 Wijzigingen via de web-UI vereisen een CSRF-token
     When een formulier zonder CSRF-token wordt verstuurd
@@ -49,11 +54,25 @@ de bestuurder de ledenlijst opvraagt
 wordt de toegang geweigerd
     Should Be Equal As Integers    ${RESP.status_code}    403
 
-de beheerder een donatie probeert te registreren
-    ${body}=    Create Dictionary    member_id=1    subcategory_id=1    amount=5
+de penningmeester een categorie probeert aan te maken
+    ${body}=    Create Dictionary    name=Niet Toegestaan
+    ${resp}=    POST On Session    api    ${API}/categories    json=${body}    headers=${PENNINGMEESTER}
+    ...    expected_status=anything
+    Set Test Variable    ${RESP}    ${resp}
+
+de beheerder een donatie registreert
+    ${lid}=    Maak lid aan    Beheerder Lid
+    ${sub_id}=    Subcategorie-id van    Sponsoring    MKB
+    ${body}=    Create Dictionary    member_id=${lid}[id]    subcategory_id=${sub_id}    amount=7.50
     ${resp}=    POST On Session    api    ${API}/donations    json=${body}    headers=${BEHEERDER}
     ...    expected_status=anything
     Set Test Variable    ${RESP}    ${resp}
+
+is de donatie opgeslagen
+    Should Be Equal As Integers    ${RESP.status_code}    201
+
+kan de beheerder de CSV-export downloaden
+    GET On Session    api    ${API}/reports/export.csv    headers=${BEHEERDER}    expected_status=200
 
 een formulier zonder CSRF-token wordt verstuurd
     ${form}=    Create Dictionary    name=Zonder Token    email=geen-token@example.nl

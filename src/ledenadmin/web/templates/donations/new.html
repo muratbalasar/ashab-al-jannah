@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import field_error, invalid, form_error, csrf %}
+{% from "macros.html" import field_error, invalid, form_error, csrf, date_field %}
 {% block title %}Donatie registreren – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Donatie registreren</h1>
@@ -34,11 +34,7 @@
              value="{{ values.get('amount', '') }}" {{ invalid(errors, 'amount') }}>
       {{ field_error(errors, 'amount') }}
     </label>
-    <label for="donated_at">Datum en tijd
-      <input id="donated_at" name="donated_at" type="datetime-local" required
-             value="{{ values.get('donated_at', '') }}" {{ invalid(errors, 'donated_at') }}>
-      {{ field_error(errors, 'donated_at') }}
-    </label>
+    {{ date_field("donated_at", "Datum en tijd", values.get('donated_at', ''), errors, with_time=True, required=True) }}
   </div>
   <label for="description">Omschrijving (optioneel)
     <input id="description" name="description" type="text" maxlength="500"

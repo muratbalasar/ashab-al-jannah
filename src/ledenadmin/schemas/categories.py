@@ -15,6 +15,17 @@ class SubcategoryCreate(BaseModel):
     name: CategoryName
 
 
+class CategoryUpdate(BaseModel):
+    """Gedeeltelijke wijziging; alleen meegestuurde velden worden aangepast."""
+
+    name: CategoryName | None = None
+    is_active: bool | None = None
+
+
+class SubcategoryUpdate(CategoryUpdate):
+    pass
+
+
 class SubcategoryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

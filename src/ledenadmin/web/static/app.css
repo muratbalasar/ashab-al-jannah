@@ -118,8 +118,197 @@ header nav ul:last-child {
   height: 16rem;
 }
 
+/* Rapportage: elk onderdeel krijgt ruimte en een frisse scheidingslijn erboven */
+.report-section {
+  margin: 0;
+  padding-block: 1.75rem;
+}
+
+.report-section + .report-section {
+  border-top: 3px solid var(--pico-muted-border-color);
+  border-top-color: color-mix(in srgb, var(--pico-primary) 35%, transparent);
+}
+
+header + .report-section {
+  padding-top: 0.5rem;
+}
+
+.report-section:last-child {
+  padding-bottom: 0.25rem;
+}
+
+.report-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1.15rem;
+}
+
+.report-section .kpis,
+.report-section figure,
+.report-section .breakdown table,
+.report-section details {
+  margin-bottom: 0;
+}
+
+.report-section figcaption {
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: var(--pico-color);
+}
+
+/* Twee tabellen naast elkaar: op mobiel onder elkaar met ruimte ertussen */
+.report-section.grid {
+  row-gap: 1.75rem;
+}
+
 .insight-text {
   white-space: pre-line;
+}
+
+/* ── Datumvelden ── */
+
+.date-field {
+  position: relative;
+}
+
+.date-field [role="group"] {
+  margin-bottom: var(--pico-spacing);
+}
+
+.date-field .date-picker-button {
+  flex: 0 0 auto;
+  padding-inline: 0.85rem;
+}
+
+.date-field small.error {
+  margin-top: calc(var(--pico-spacing) * -0.75);
+  margin-bottom: var(--pico-spacing);
+}
+
+/* Onzichtbaar, maar wel gerenderd: showPicker() werkt niet op display:none.
+   Linksonder het veld, zodat de kalender daar opent. */
+.date-field .date-proxy {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 1px;
+  height: 1px;
+  margin: calc(var(--pico-spacing) * -1) 0 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Categoriebeheer ── */
+
+.new-category {
+  max-width: 32rem;
+  margin-bottom: calc(var(--pico-spacing) * 1.5);
+}
+
+.cat-card {
+  padding: 0.75rem 1.25rem;
+}
+
+.cat-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  min-height: 2.75rem;
+}
+
+h2.cat-name {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.cat-list {
+  margin: 0.25rem 0 0;
+  padding: 0;
+}
+
+.cat-list li {
+  list-style: none;
+  border-top: 1px solid var(--pico-muted-border-color);
+  padding: 0.15rem 0 0.15rem 1rem;
+}
+
+.cat-list li.add-row {
+  padding-block: 0.6rem 0.25rem;
+}
+
+.is-inactive .cat-name {
+  color: var(--pico-muted-color);
+}
+
+.inactive-tag {
+  margin-inline-start: 0.4rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 1rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--pico-muted-color);
+  vertical-align: middle;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.row-actions form {
+  margin: 0;
+}
+
+/* Tekstknoppen: rustiger dan volle knoppen, maar wel echte knoppen/links */
+.link-action,
+button.link-action {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--pico-primary);
+  font-size: 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.link-action:hover {
+  text-decoration: underline;
+}
+
+.link-action.muted {
+  color: var(--pico-muted-color);
+}
+
+/* Vaste breedte zodat "Wijzigen" uitlijnt, of er nu Activeren of Deactiveren staat */
+.row-actions button.link-action {
+  min-width: 5.5rem;
+  text-align: right;
+}
+
+.edit-form {
+  flex: 1 1 18rem;
+  margin: 0;
+}
+
+.edit-form fieldset {
+  margin-bottom: 0;
+}
+
+.edit-form button {
+  white-space: nowrap;
+}
+
+.edit-form small.error {
+  margin: 0.25rem 0 0;
 }
 
 .htmx-indicator {

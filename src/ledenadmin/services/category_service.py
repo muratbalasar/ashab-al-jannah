@@ -49,6 +49,44 @@ class CategoryService:
         self._commit(f"Subcategorie '{name}' bestaat al")
         return subcategory
 
+    def update_category(
+        self, category_id: int, name: str | None = None, is_active: bool | None = None
+    ) -> Category:
+        category = self.get_category(category_id)
+        if name is not None and name != category.name:
+            existing = self._categories.get_by_name(name)
+            if existing is not None and existing.id != category.id:
+                raise ConflictError(f"Categorie '{name}' bestaat al", field="name")
+            category.name = name
+        if is_active is not None:
+            category.is_active = is_active
+        self._commit(f"Categorie '{name}' bestaat al")
+        return category
+
+    def update_subcategory(
+        self,
+        category_id: int,
+        subcategory_id: int,
+        name: str | None = None,
+        is_active: bool | None = None,
+    ) -> Subcategory:
+        subcategory = self.get_subcategory(subcategory_id)
+        if subcategory.category_id != category_id:
+            raise NotFoundError(
+                f"Subcategorie {subcategory_id} hoort niet bij categorie {category_id}"
+            )
+        if name is not None and name != subcategory.name:
+            existing = self._categories.get_subcategory_by_name(category_id, name)
+            if existing is not None and existing.id != subcategory.id:
+                raise ConflictError(
+                    f"Subcategorie '{name}' bestaat al in '{subcategory.category.name}'", "name"
+                )
+            subcategory.name = name
+        if is_active is not None:
+            subcategory.is_active = is_active
+        self._commit(f"Subcategorie '{name}' bestaat al")
+        return subcategory
+
     def ensure_defaults(self) -> bool:
         """Vult standaardcategorieën als er nog geen categorieën zijn. Idempotent."""
         if self._categories.list(include_inactive=True):

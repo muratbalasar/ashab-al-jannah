@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Categorieën – {{ app_name }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>Categorieën</h1>
+  <p>Inactieve (sub)categorieën zijn niet te kiezen bij nieuwe donaties, maar blijven in rapportages staan.</p>
+</hgroup>
+{% include "categories/_beheer.html" %}
+{% endblock %}

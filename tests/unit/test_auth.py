@@ -64,12 +64,16 @@ def test_dev_provider_defaults_and_header_override() -> None:
 def test_role_permissions() -> None:
     bestuurder = Principal("b", parse_roles(["bestuurder"]))
     penningmeester = Principal("p", parse_roles(["penningmeester"]))
+    beheerder = Principal("h", parse_roles(["beheerder"]))
 
     assert bestuurder.can(Permission.REPORTS_READ)
     assert not bestuurder.can(Permission.MEMBERS_READ)
     assert not bestuurder.can(Permission.REPORTS_MEMBER_READ)
     assert penningmeester.can(Permission.DONATIONS_WRITE)
     assert not penningmeester.can(Permission.MEMBERS_WRITE)
+    assert beheerder.permissions == frozenset(Permission)
+    assert not penningmeester.can(Permission.CATEGORIES_WRITE)
+    assert not bestuurder.can(Permission.CATEGORIES_WRITE)
 
 
 def test_dev_auth_is_refused_in_production() -> None:
