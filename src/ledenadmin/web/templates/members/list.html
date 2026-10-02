@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Leden – {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Leden</h1>
+  {% if principal.can(Permission.MEMBERS_WRITE) %}<a role="button" href="/leden/nieuw">Nieuw lid</a>{% endif %}
+</div>
+
+<search aria-label="Leden zoeken">
+<form class="member-filter" action="/leden" method="get"
+      hx-get="/leden" hx-target="#leden-tabel" hx-push-url="true"
+      hx-trigger="input changed delay:300ms from:#q, change from:#status, submit">
+  <div class="grid">
+    <label for="q">Zoek op naam of e-mail
+      <input id="q" name="q" type="search" value="{{ q }}" autocomplete="off">
+    </label>
+    <label for="status">Status
+      <select id="status" name="status">
+        <option value="">Alle</option>
+        <option value="actief" {% if status == "actief" %}selected{% endif %}>Actief</option>
+        <option value="inactief" {% if status == "inactief" %}selected{% endif %}>Inactief</option>
+      </select>
+    </label>
+  </div>
+  <noscript><button type="submit">Zoeken</button></noscript>
+</form>
+</search>
+
+<div id="leden-tabel" aria-live="polite">
+  {% include "members/_table.html" %}
+</div>
+{% endblock %}

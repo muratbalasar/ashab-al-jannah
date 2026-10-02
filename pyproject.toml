@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ledenadmin"
+version = "0.1.0"
+description = "Ashab al-Jannah: ledenadministratie met donatieregistratie, rapportage en AI-inzichten"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142",
+    "uvicorn[standard]>=0.54",
+    "sqlalchemy>=2.1",
+    "alembic>=1.20",
+    "pydantic>=2.13",
+    "pydantic-settings>=2.15",
+    "email-validator>=2.3",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.32",
+    "pandas>=3.0",
+]
+
+[project.optional-dependencies]
+ai = ["openai>=3.24", "anthropic>=1.11"]
+azure-sql = ["pyodbc>=5.3"]
+dev = [
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+    "httpx>=0.28",
+    "black>=26.5",
+    "isort>=9.0",
+    "flake8>=7.4",
+    "robotframework>=7.5",
+    "robotframework-requests>=0.9.7",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ledenadmin = ["web/templates/**/*.html", "web/static/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+pythonpath = ["src"]
+addopts = "--strict-markers"
+filterwarnings = ["error::DeprecationWarning:ledenadmin.*"]
+
+[tool.coverage.run]
+source = ["ledenadmin"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["ledenadmin"]

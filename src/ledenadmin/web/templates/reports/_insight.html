@@ -1,0 +1,9 @@
+{% for message in errors.values() %}<p class="error" role="alert">{{ message }}</p>{% endfor %}
+{% if insight %}
+<article class="insight">
+  <header>Analyse {{ insight.period }}</header>
+  {% if insight.warning %}<p class="warning" role="status">{{ insight.warning }}</p>{% endif %}
+  <p class="insight-text">{{ insight.text }}</p>
+  <footer><small>Bron: {{ "externe AI-dienst" if insight.external else "lokale analyse" }} ({{ insight.provider }}). Geen financieel advies.</small></footer>
+</article>
+{% endif %}

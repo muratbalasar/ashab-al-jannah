@@ -1,0 +1,23 @@
+{% from "macros.html" import field_error, invalid, form_error, csrf %}
+<form method="post" action="{{ action }}" data-once novalidate>
+  {{ csrf(csrf_token) }}
+  {{ form_error(errors) }}
+  <label for="name">Naam
+    <input id="name" name="name" type="text" required maxlength="200" autocomplete="name"
+           value="{{ values.get('name', '') }}" {{ invalid(errors, 'name') }} {% if readonly %}disabled{% endif %}>
+    {{ field_error(errors, 'name') }}
+  </label>
+  <label for="email">E-mail
+    <input id="email" name="email" type="email" required maxlength="320" autocomplete="email" inputmode="email"
+           value="{{ values.get('email', '') }}" {{ invalid(errors, 'email') }} {% if readonly %}disabled{% endif %}>
+    {{ field_error(errors, 'email') }}
+  </label>
+  <fieldset>
+    <legend>Status</legend>
+    {% for value, label in [("actief", "Actief"), ("inactief", "Inactief")] %}
+    <label><input type="radio" name="status" value="{{ value }}" {% if values.get('status') == value %}checked{% endif %} {% if readonly %}disabled{% endif %}> {{ label }}</label>
+    {% endfor %}
+    {{ field_error(errors, 'status') }}
+  </fieldset>
+  {% if not readonly %}<button type="submit">{{ submit_label }}</button>{% endif %}
+</form>

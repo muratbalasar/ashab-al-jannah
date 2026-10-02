@@ -1,0 +1,2 @@
+# Driver voor Azure SQL Database (vereist ook Microsoft ODBC Driver 18 op het systeem).
+pyodbc==5.3.0

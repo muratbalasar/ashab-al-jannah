@@ -1,0 +1,3 @@
+# Optionele externe AI-providers (alleen nodig bij AI_PROVIDER=openai of anthropic).
+openai==3.24.0
+anthropic==1.11.0

@@ -1,0 +1,28 @@
+{% if donations %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr>
+        <th scope="col">Datum</th>
+        {% if not hide_member %}<th scope="col">Lid</th>{% endif %}
+        <th scope="col">Categorie</th>
+        <th scope="col" class="hide-sm">Subcategorie</th>
+        <th scope="col" class="num">Bedrag</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in donations %}
+      <tr>
+        <td>{{ d.donated_at | localdt }}</td>
+        {% if not hide_member %}<td><a href="/leden/{{ d.member_id }}">{{ d.member_name }}</a></td>{% endif %}
+        <td>{{ d.category }}</td>
+        <td class="hide-sm">{{ d.subcategory }}</td>
+        <td class="num">{{ d.amount | eur }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Geen donaties gevonden.</p>
+{% endif %}

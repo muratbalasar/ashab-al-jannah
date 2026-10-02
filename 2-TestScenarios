@@ -1,0 +1,131 @@
+# Gherkin-scenario's (Nederlandse stappen, Engelse sleutelwoorden).
+# Elk scenario is 1-op-1 geautomatiseerd in tests/functional (zelfde naam, zelfde stappen).
+
+Feature: Leden beheren (US01) – tests/functional/02_ledenbeheer.robot
+
+  Scenario: Beheerder maakt een lid aan
+    Given de beheerder is aangemeld
+    When de beheerder een lid opslaat met naam "Jan Jansen" en een uniek e-mailadres
+    Then bestaat het lid met een uniek ID en de status "actief"
+    And is het lid terug te vinden in de ledenlijst
+
+  Scenario: Dubbel e-mailadres wordt afgewezen
+    Given er bestaat een lid met een uniek e-mailadres
+    When de beheerder een ander lid probeert op te slaan met hetzelfde e-mailadres in hoofdletters
+    Then wordt het lid niet aangemaakt omdat het e-mailadres al in gebruik is
+
+  Scenario: Lid inactief maken behoudt de historie
+    Given een lid heeft een geregistreerde donatie
+    When de beheerder het lid op inactief zet
+    Then staat het lid als "inactief" in de ledenadministratie
+    And blijft de bestaande donatie gekoppeld aan het lid
+
+
+Feature: Donaties registreren (US02) – tests/functional/03_donaties.robot
+
+  Scenario: Donatie registreren met standaarddatum
+    Given lid "Jan Jansen" bestaat
+    When de penningmeester een donatie van 50.00 euro registreert in "Sponsoring" / "MKB"
+    Then is precies één donatie geregistreerd voor dat lid
+    And bevat de donatie het bedrag "50.00", categorie "Sponsoring" en subcategorie "MKB"
+    And ligt het tijdstip rond het moment van opslaan
+
+  Scenario: Donatie registreren met aangepaste datum
+    Given lid "Jan Jansen" bestaat
+    When de penningmeester een donatie van 25.00 euro registreert op "2026-02-14T10:30:00"
+    Then is de donatie opgeslagen op "2026-02-14T09:30:00Z" (UTC)
+
+  Scenario: Ongeldige donatie wordt niet opgeslagen
+    Given lid "Jan Jansen" bestaat
+    When de penningmeester een donatie met bedrag 0 probeert te registreren
+    Then wordt de donatie afgewezen met een validatiemelding
+    And heeft het lid geen donaties
+
+  Scenario: Donatie voor een onbekend lid wordt afgewezen
+    When de penningmeester een donatie registreert voor een lid dat niet bestaat
+    Then wordt de donatie afgewezen met de melding "Kies een bestaand lid"
+
+
+Feature: Rapportage per periode, per lid en met filters (US04, US05, US06) – tests/functional/04_rapportage.robot
+
+  Scenario: Rapportage filtert op inclusieve periode
+    Given een lid heeft donaties op 31 januari 23:30, 1 februari 00:00 en 28 februari 23:59
+    When de penningmeester de periode "2026-02-01" tot en met "2026-02-28" kiest voor dat lid
+    Then bevat de rapportage 2 donaties met een totaal van "80.00"
+    And tellen de uitsplitsingen per categorie en per maand op tot het totaal
+
+  Scenario: Rapportage per lid en periode
+    Given twee leden hebben donaties in februari 2026
+    When de penningmeester het eerste lid en februari 2026 selecteert
+    Then bevat het overzicht alleen donaties van het eerste lid
+    And is het totaal gelijk aan de som van de getoonde donaties
+
+  Scenario: Rapportage filtert op categorie
+    Given een lid heeft donaties in "Sponsoring" en "Contributie"
+    When de penningmeester filtert op categorie "Contributie"
+    Then bevat de rapportage alleen donaties in categorie "Contributie"
+
+  Scenario: Rapportage toont lege periode
+    When de bestuurder een periode zonder donaties kiest
+    Then is de rapportage leeg met totaal "0.00"
+
+  Scenario: Einddatum voor begindatum wordt afgewezen
+    When de bestuurder een einddatum vóór de begindatum kiest
+    Then wordt het rapport afgewezen met een melding over de einddatum
+
+
+Feature: AI-inzicht opvragen (US07) – tests/functional/05_ai_analyse.robot
+
+  Scenario: AI analyse volgt de rapportagefilters
+    Given een lid heeft donaties in maart 1999
+    When de bestuurder "AI Analyse" kiest voor maart 1999
+    Then benoemt de analyse de periode "01-03-1999 t/m 31-03-1999"
+    And bevat de analyse het totaal van de selectie
+    And bevat de analyse geen namen of e-mailadressen
+
+  Scenario: AI analyse meldt ontbrekende gegevens
+    When de bestuurder "AI Analyse" kiest voor een periode zonder donaties
+    Then meldt de applicatie dat er onvoldoende gegevens zijn
+
+
+Feature: Gegevens veilig beheren (US08) – tests/functional/06_autorisatie.robot
+
+  Scenario: Bestuurder ziet totalen maar geen persoonsgegevens
+    Given er is een donatie geregistreerd
+    When de bestuurder de rapportage opvraagt
+    Then ziet de bestuurder het totaal
+    And bevat de rapportage geen uitsplitsing per lid of losse donaties
+
+  Scenario: Bestuurder heeft geen toegang tot de ledenadministratie
+    When de bestuurder de ledenlijst opvraagt
+    Then wordt de toegang geweigerd
+
+  Scenario: Beheerder kan geen donaties registreren
+    When de beheerder een donatie probeert te registreren
+    Then wordt de toegang geweigerd
+
+  Scenario: Wijzigingen via de web-UI vereisen een CSRF-token
+    When een formulier zonder CSRF-token wordt verstuurd
+    Then wordt de toegang geweigerd
+
+
+# ── Na de MVP (nog niet geautomatiseerd) ──────────────────────────────────────
+
+Feature: Boekhoudexport (US09)
+
+  @na-mvp
+  Scenario: Boekhoudexport wordt vooraf gecontroleerd
+    Given de penningmeester heeft een periode voor export geselecteerd
+    When de penningmeester een boekhoudexport voorbereidt
+    Then ziet de penningmeester de gegevens en het doelpakket in een preview
+    And worden gegevens pas na expliciete bevestiging verzonden
+
+
+Feature: Bankafschrift verwerken (US10)
+
+  @na-mvp
+  Scenario: Import vereist bevestiging van voorgestelde matches
+    Given de penningmeester heeft een bankafschrift geselecteerd
+    When de applicatie transacties en mogelijke ledenmatches herkent
+    Then ziet de penningmeester de herkende waarden en onzekerheden
+    And worden transacties pas na expliciete bevestiging geïmporteerd
