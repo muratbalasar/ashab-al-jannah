@@ -24,3 +24,4 @@ class Permission(StrEnum):
     INSIGHTS_READ = "insights:read"
     EXPORT = "export"
     AUDIT_READ = "audit:read"
+    MEMBER_FIELDS_WRITE = "member-fields:write"

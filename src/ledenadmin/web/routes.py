@@ -18,6 +18,7 @@ from ledenadmin.schemas.categories import CategoryCreate
 from ledenadmin.schemas.donations import DonationCreate, DonationRead
 from ledenadmin.schemas.members import MemberCreate, MemberUpdate
 from ledenadmin.schemas.reports import Report, ReportFilter
+from ledenadmin.services.member_field_service import FIELD_TYPE_LABELS, FieldType
 from ledenadmin.web.dates import nl_date_to_iso, nl_datetime_to_iso
 from ledenadmin.web.security import verify_csrf
 
@@ -32,6 +33,7 @@ MESSAGES = {
     "categorie-opgeslagen": "De categorie is opgeslagen.",
     "subcategorie-opgeslagen": "De subcategorie is opgeslagen.",
     "verwijderd": "Verwijderd.",
+    "veld-opgeslagen": "Het veld is opgeslagen.",
 }
 
 CATEGORY_NAME_ERROR = "Vul een naam in (maximaal 100 tekens)."
@@ -174,8 +176,23 @@ def members_list(
 
 
 @router.get("/leden/nieuw")
-def member_new(request: Request, _: _perm(Permission.MEMBERS_WRITE)) -> Response:
-    return render(request, "members/new.html", {"values": {"status": "actief"}, "errors": {}})
+def member_new(
+    request: Request, services: Services, _: _perm(Permission.MEMBERS_WRITE)
+) -> Response:
+    context = {"values": {"status": "actief"}, "errors": {}}
+    return render(request, "members/new.html", context | _extra_fields(services))
+
+
+def _extra_fields(services: Services) -> dict[str, Any]:
+    return {"extra_fields": services.member_fields.list(), "field_types": FieldType}
+
+
+async def _extra_form(request: Request) -> dict[str, str]:
+    form = await request.form()
+    return {k: v for k, v in form.items() if k.startswith("veld_") and isinstance(v, str)}
+
+
+ExtraForm = Annotated[dict[str, str], Depends(_extra_form)]
 
 
 @router.post("/leden")
@@ -183,20 +200,28 @@ def member_create(
     request: Request,
     services: Services,
     principal: _perm(Permission.MEMBERS_WRITE),
+    extra: ExtraForm,
     name: FormText = "",
     email: FormText = "",
     status: FormText = "actief",
 ) -> Response:
-    values = {"name": name, "email": email, "status": status}
+    values: dict[str, str] = {"name": name, "email": email, "status": status} | extra
+    extra_values, errors = services.member_fields.validate(extra)
+    context = _extra_fields(services)
     try:
-        member = services.members.create(MemberCreate.model_validate(clean(values)), principal.name)
+        data = MemberCreate.model_validate(clean(values))
     except ValidationError as exc:
+        errors = form_errors(exc) | errors
+    if errors:
         return render(
-            request, "members/new.html", {"values": values, "errors": form_errors(exc)}, 422
+            request, "members/new.html", context | {"values": values, "errors": errors}, 422
         )
+    try:
+        member = services.members.create(data, principal.name)
     except DomainError as exc:
-        context = {"values": values, "errors": domain_errors(exc)}
+        context |= {"values": values, "errors": domain_errors(exc)}
         return render(request, "members/new.html", context, 409)
+    services.member_fields.save(member.id, extra_values)
     return RedirectResponse(f"/leden/{member.id}?melding=lid-aangemaakt", status_code=303)
 
 
@@ -207,7 +232,7 @@ def _member_detail(request, services, principal, member, values, errors, status_
         else []
     )
     context = {"member": member, "values": values, "errors": errors, "donations": donations}
-    return render(request, "members/detail.html", context, status_code)
+    return render(request, "members/detail.html", context | _extra_fields(services), status_code)
 
 
 @router.get("/leden/{member_id}")
@@ -216,6 +241,7 @@ def member_detail(
 ) -> Response:
     member = services.members.get(member_id)
     values = {"name": member.name, "email": member.email, "status": member.status.value}
+    values |= {f"veld_{k}": v for k, v in services.member_fields.values(member_id).items()}
     return _member_detail(request, services, principal, member, values, {})
 
 
@@ -225,22 +251,84 @@ def member_update(
     member_id: int,
     services: Services,
     principal: _perm(Permission.MEMBERS_WRITE),
+    extra: ExtraForm,
     name: FormText = "",
     email: FormText = "",
     status: FormText = "",
 ) -> Response:
     member = services.members.get(member_id)
-    values = {"name": name, "email": email, "status": status}
+    values: dict[str, str] = {"name": name, "email": email, "status": status} | extra
+    extra_values, errors = services.member_fields.validate(extra)
     try:
         data = MemberUpdate.model_validate(
             {"name": name.strip(), "email": email.strip(), "status": status}
         )
-        services.members.update(member_id, data)
     except ValidationError as exc:
-        return _member_detail(request, services, principal, member, values, form_errors(exc), 422)
+        errors = form_errors(exc) | errors
+    if errors:
+        return _member_detail(request, services, principal, member, values, errors, 422)
+    try:
+        services.members.update(member_id, data)
     except DomainError as exc:
         return _member_detail(request, services, principal, member, values, domain_errors(exc), 409)
+    services.member_fields.save(member_id, extra_values)
     return RedirectResponse(f"/leden/{member_id}?melding=lid-bijgewerkt", status_code=303)
+
+
+# ── Ledenvelden (beheerder) ─────────────────────────────────────────────────
+
+CanManageFields = _perm(Permission.MEMBER_FIELDS_WRITE)
+
+
+def _fields_page(
+    request: Request,
+    services: Services,
+    values: dict[str, str] | None = None,
+    errors: dict[str, str] | None = None,
+    status_code: int = 200,
+) -> Response:
+    context = {
+        "fields": services.member_fields.list(include_inactive=True),
+        "type_labels": FIELD_TYPE_LABELS,
+        "values": values or {"field_type": FieldType.TEXT},
+        "errors": errors or {},
+    }
+    return render(request, "member_fields/index.html", context, status_code)
+
+
+@router.get("/ledenvelden")
+def member_fields_index(request: Request, services: Services, _: CanManageFields) -> Response:
+    return _fields_page(request, services)
+
+
+@router.post("/ledenvelden")
+def member_field_create(
+    request: Request,
+    services: Services,
+    _: CanManageFields,
+    label: FormText = "",
+    field_type: FormText = "",
+) -> Response:
+    values = {"label": label, "field_type": field_type}
+    try:
+        services.member_fields.create(label, field_type)
+    except ConflictError as exc:
+        return _fields_page(request, services, values, domain_errors(exc), 422)
+    return RedirectResponse("/ledenvelden?melding=veld-opgeslagen", status_code=303)
+
+
+@router.post("/ledenvelden/{field_id}/status")
+def member_field_status(
+    field_id: int, services: Services, _: CanManageFields, is_active: FormBool
+) -> Response:
+    services.member_fields.set_active(field_id, is_active)
+    return RedirectResponse("/ledenvelden?melding=veld-opgeslagen", status_code=303)
+
+
+@router.post("/ledenvelden/{field_id}/verwijderen")
+def member_field_delete(field_id: int, services: Services, _: CanManageFields) -> Response:
+    services.member_fields.delete(field_id)
+    return RedirectResponse("/ledenvelden?melding=verwijderd", status_code=303)
 
 
 # ── Logboek ──────────────────────────────────────────────────────────────────

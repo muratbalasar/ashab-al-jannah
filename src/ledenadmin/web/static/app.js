@@ -344,6 +344,12 @@
     });
   });
 
+  // Bevestiging voor gewone formulieren met data-confirm.
+  document.addEventListener("submit", function (event) {
+    const message = event.target.dataset && event.target.dataset.confirm;
+    if (message && !window.confirm(message)) event.preventDefault();
+  });
+
   // Lange tabellen: toon 50 rijen en voeg er steeds 50 toe bij scrollen of "Meer weergeven".
   const PAGE_SIZE = 50;
   const pagerObserver =

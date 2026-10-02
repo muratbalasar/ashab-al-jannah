@@ -305,6 +305,15 @@ header + .report-section {
 
 /* ── Logboek ── */
 
+.row-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.row-actions form {
+  margin: 0;
+}
+
 .show-more {
   display: block;
   width: 100%;

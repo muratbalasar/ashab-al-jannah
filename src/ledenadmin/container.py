@@ -12,6 +12,7 @@ from ledenadmin.services.category_service import CategoryService
 from ledenadmin.services.donation_service import DonationService
 from ledenadmin.services.exporters.base import ReportExporter
 from ledenadmin.services.exporters.csv_exporter import CsvDonationExporter
+from ledenadmin.services.member_field_service import MemberFieldService
 from ledenadmin.services.member_service import MemberService
 from ledenadmin.services.report_service import ReportService
 
@@ -28,6 +29,10 @@ class ServiceContainer:
     @cached_property
     def members(self) -> MemberService:
         return MemberService(self._session)
+
+    @cached_property
+    def member_fields(self) -> MemberFieldService:
+        return MemberFieldService(self._session)
 
     @cached_property
     def categories(self) -> CategoryService:
