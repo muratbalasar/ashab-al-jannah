@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "attributesToSettle": ["class", "width", "height"]}'>
+  <title>{% block title %}{{ app_name }} – {{ app_tagline }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='vendor/pico.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+  <script src="{{ url_for('static', path='vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='vendor/chart.umd.min.js') }}" defer></script>
+  <script src="{{ url_for('static', path='app.js') }}" defer></script>
+</head>
+<body hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+  <a class="skip-link" href="#inhoud">Naar inhoud</a>
+  <header class="container">
+    <nav aria-label="Hoofdmenu">
+      <ul>
+        <li>
+          <a href="/" class="brand" aria-label="{{ app_name }} – startpagina">
+            <strong>{{ app_name }}</strong>
+            <span class="brand-ar hide-sm" lang="ar" dir="rtl">{{ app_name_arabic }}</span>
+          </a>
+        </li>
+      </ul>
+      {% if principal %}
+      <ul>
+        {% if principal.can(Permission.MEMBERS_READ) %}<li><a href="/leden">Leden</a></li>{% endif %}
+        {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="/donaties">Donaties</a></li>{% endif %}
+        {% if principal.can(Permission.REPORTS_READ) %}<li><a href="/rapportage">Rapportage</a></li>{% endif %}
+        <li><small title="Aangemeld als">{{ principal.name }}</small></li>
+      </ul>
+      {% endif %}
+    </nav>
+  </header>
+  <main class="container" id="inhoud">
+    {% if melding %}<p class="notice" role="status">{{ melding }}</p>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

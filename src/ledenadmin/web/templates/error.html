@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Fout {{ status_code }} – {{ app_name }}{% endblock %}
+{% block content %}
+<article>
+  <h1>Er ging iets mis</h1>
+  <p role="alert">{{ message }}</p>
+  <p><a href="/">Terug naar het overzicht</a></p>
+</article>
+{% endblock %}

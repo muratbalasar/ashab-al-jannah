@@ -1,0 +1,13 @@
+<section class="breakdown">
+  <h3>{{ title }}</h3>
+  <div class="overflow-auto">
+    <table class="striped">
+      <thead><tr><th scope="col">Omschrijving</th><th scope="col" class="num">Aantal</th><th scope="col" class="num">Bedrag</th></tr></thead>
+      <tbody>
+        {% for row in rows %}
+        <tr><td>{{ row.label }}</td><td class="num">{{ row.count }}</td><td class="num">{{ row.total | eur }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>

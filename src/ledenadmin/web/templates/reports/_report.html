@@ -1,0 +1,49 @@
+{% for message in errors.values() %}<p class="error" role="alert">{{ message }}</p>{% endfor %}
+
+{% if report %}
+<article>
+  <header class="page-head">
+    <span>Periode {{ report.filter.describe_period() }}</span>
+    {% if principal.can(Permission.EXPORT) and not report.is_empty %}
+    <a href="/api/v1/reports/export.csv?{{ export_query }}" download>Exporteer CSV</a>
+    {% endif %}
+  </header>
+
+  {% if report.is_empty %}
+  <p class="empty">Geen gegevens voor deze periode.</p>
+  {% else %}
+  <div class="grid kpis">
+    <div><small>Totaal</small><p class="kpi" data-testid="totaal">{{ report.total | eur }}</p></div>
+    <div><small>Aantal donaties</small><p class="kpi" data-testid="aantal">{{ report.count }}</p></div>
+    <div><small>Gemiddeld</small><p class="kpi">{{ report.average | eur }}</p></div>
+  </div>
+
+  <div class="grid charts">
+    <figure>
+      <figcaption>Bedrag per categorie</figcaption>
+      <div class="chart-box"><canvas id="grafiek-categorie" data-chart="grafiek-categorie-data" role="img" aria-label="Staafdiagram bedrag per categorie"></canvas></div>
+      <script type="application/json" id="grafiek-categorie-data">{{ charts.category | tojson }}</script>
+    </figure>
+    <figure>
+      <figcaption>Bedrag per maand</figcaption>
+      <div class="chart-box"><canvas id="grafiek-maand" data-chart="grafiek-maand-data" role="img" aria-label="Lijndiagram bedrag per maand"></canvas></div>
+      <script type="application/json" id="grafiek-maand-data">{{ charts.month | tojson }}</script>
+    </figure>
+  </div>
+
+  <div class="grid">
+    {% with title="Per categorie", rows=report.by_category %}{% include "reports/_breakdown.html" %}{% endwith %}
+    {% with title="Per maand", rows=report.by_month %}{% include "reports/_breakdown.html" %}{% endwith %}
+  </div>
+  {% with title="Per subcategorie", rows=report.by_subcategory %}{% include "reports/_breakdown.html" %}{% endwith %}
+
+  {% if report.includes_member_details %}
+    {% with title="Per lid", rows=report.by_member %}{% include "reports/_breakdown.html" %}{% endwith %}
+    <details>
+      <summary>Alle {{ report.count }} donaties in deze selectie</summary>
+      {% with donations=report.donations, hide_member=False %}{% include "donations/_table.html" %}{% endwith %}
+    </details>
+  {% endif %}
+  {% endif %}
+</article>
+{% endif %}

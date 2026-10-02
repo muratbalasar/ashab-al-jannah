@@ -1,0 +1,21 @@
+{% if members %}
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr><th scope="col">Nr.</th><th scope="col">Naam</th><th scope="col">E-mail</th><th scope="col">Status</th></tr>
+    </thead>
+    <tbody>
+      {% for member in members %}
+      <tr>
+        <td>{{ member.id }}</td>
+        <td><a href="/leden/{{ member.id }}">{{ member.name }}</a></td>
+        <td>{{ member.email }}</td>
+        <td><span class="badge {{ member.status.value }}">{{ member.status.value | capitalize }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p>Geen leden gevonden.</p>
+{% endif %}

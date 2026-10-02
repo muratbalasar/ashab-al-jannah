@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "macros.html" import field_error, invalid %}
+{% block title %}Rapportage – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Rapportage</h1>
+
+<form id="report-filter" action="/rapportage" method="get"
+      hx-get="/rapportage" hx-target="#rapport" hx-push-url="true" hx-trigger="change, submit">
+  <div class="grid">
+    <label for="start_date">Van
+      <input id="start_date" name="start_date" type="date" value="{{ values.get('start_date', '') }}" {{ invalid(errors, 'start_date') }}>
+    </label>
+    <label for="end_date">Tot en met
+      <input id="end_date" name="end_date" type="date" value="{{ values.get('end_date', '') }}" {{ invalid(errors, 'end_date') }}>
+    </label>
+  </div>
+  <div class="grid">
+    {% if principal.can(Permission.REPORTS_MEMBER_READ) %}
+    <label for="member_id">Lid
+      <select id="member_id" name="member_id">
+        <option value="">Alle leden</option>
+        {% for m in members %}
+        <option value="{{ m.id }}" {% if values.get('member_id') == m.id|string %}selected{% endif %}>{{ m.name }} ({{ m.id }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <label for="category_id">Categorie
+      <select id="category_id" name="category_id">
+        <option value="">Alle categorieën</option>
+        {% for c in categories %}
+        <option value="{{ c.id }}" {% if values.get('category_id') == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label for="subcategory_id">Subcategorie
+      <select id="subcategory_id" name="subcategory_id">
+        <option value="">Alle subcategorieën</option>
+        {% for c in categories %}
+        <optgroup label="{{ c.name }}">
+          {% for s in c.subcategories %}
+          <option value="{{ s.id }}" {% if values.get('subcategory_id') == s.id|string %}selected{% endif %}>{{ s.name }}</option>
+          {% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+    </label>
+  </div>
+  <div class="filter-actions">
+    <button type="submit">Toepassen</button>
+    <a role="button" class="secondary outline" href="/rapportage">Filters resetten</a>
+  </div>
+</form>
+
+<div id="rapport" aria-live="polite">
+  {% include "reports/_report.html" %}
+</div>
+
+{% if principal.can(Permission.INSIGHTS_READ) %}
+<section aria-labelledby="ai-kop">
+  <h2 id="ai-kop">AI Analyse</h2>
+  <p><small>Analyseert alleen totalen voor de actieve filters; namen en e-mailadressen worden niet gedeeld.</small></p>
+  <button type="button" class="secondary"
+          hx-post="/rapportage/ai" hx-include="#report-filter" hx-target="#inzicht" hx-disabled-elt="this">
+    AI Analyse
+  </button>
+  <div id="inzicht" aria-live="polite"></div>
+</section>
+{% endif %}
+{% endblock %}

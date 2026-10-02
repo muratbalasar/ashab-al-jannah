@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Donaties – {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Recente donaties</h1>
+  {% if principal.can(Permission.DONATIONS_WRITE) %}<a role="button" href="/donaties/nieuw">Donatie registreren</a>{% endif %}
+</div>
+{% with donations=donations, hide_member=False %}{% include "donations/_table.html" %}{% endwith %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Overzicht</h1>
+
+<div class="grid actions">
+  {% if principal.can(Permission.MEMBERS_WRITE) %}<a role="button" href="/leden/nieuw">Nieuw lid</a>{% endif %}
+  {% if principal.can(Permission.DONATIONS_WRITE) %}<a role="button" href="/donaties/nieuw">Donatie registreren</a>{% endif %}
+  {% if principal.can(Permission.REPORTS_READ) %}<a role="button" class="secondary" href="/rapportage">Rapportage</a>{% endif %}
+</div>
+
+{% if report %}
+<article>
+  <header>Deze maand ({{ report.filter.describe_period() }})</header>
+  {% if report.is_empty %}
+    <p>Nog geen donaties deze maand.</p>
+  {% else %}
+    <div class="grid kpis">
+      <div><small>Totaal</small><p class="kpi">{{ report.total | eur }}</p></div>
+      <div><small>Aantal donaties</small><p class="kpi">{{ report.count }}</p></div>
+      <div><small>Gemiddeld</small><p class="kpi">{{ report.average | eur }}</p></div>
+    </div>
+  {% endif %}
+</article>
+{% endif %}
+
+{% if not principal.permissions %}
+<p>Je account heeft nog geen rol. Vraag een beheerder om je een rol toe te kennen.</p>
+{% endif %}
+{% endblock %}

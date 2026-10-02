@@ -1,0 +1,15 @@
+{% macro field_error(errors, name) -%}
+  {% if errors.get(name) %}<small id="{{ name }}-fout" class="error">{{ errors[name] }}</small>{% endif %}
+{%- endmacro %}
+
+{% macro invalid(errors, name) -%}
+  {% if errors.get(name) %}aria-invalid="true" aria-describedby="{{ name }}-fout"{% endif %}
+{%- endmacro %}
+
+{% macro form_error(errors) -%}
+  {% if errors.get("__all__") %}<p class="error" role="alert">{{ errors["__all__"] }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro csrf(token) -%}
+  <input type="hidden" name="csrf_token" value="{{ token }}">
+{%- endmacro %}

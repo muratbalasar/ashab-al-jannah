@@ -1,0 +1,330 @@
+name: CI/CD – Ashab al-Jannah (Azure Container App)
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+      - "1-UserStories"
+      - "2-TestScenarios"
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      deploy_azure:
+        description: "Azure Container App deployen na succesvolle tests (alleen main)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  IMAGE_NAME: ashab-al-jannah
+  # Azure resource-namen (centraal beheerd)
+  AZ_RESOURCE_GROUP: rg-ashab-al-jannah
+  AZ_LOCATION: westeurope
+  AZ_CONTAINER_APP_ENV: cae-ashab-al-jannah
+  AZ_CONTAINER_APP: ashab-al-jannah
+
+jobs:
+  # ────────────────────────────────────────────────────────────────
+  # Job 1 – Code kwaliteit + unit tests (black, isort, flake8, pytest)
+  # ────────────────────────────────────────────────────────────────
+  kwaliteit:
+    name: "Kwaliteit & unit tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Afhankelijkheden installeren
+        run: |
+          pip install -r requirements-dev.txt
+          pip install --no-deps -e .
+
+      - name: Opmaak controleren (black + isort)
+        run: |
+          black --check --diff src tests migrations
+          isort --check-only --diff src tests migrations
+
+      - name: Linting (flake8)
+        run: flake8 src tests migrations
+
+      - name: Unit tests met coverage (incl. migratiecontrole)
+        run: pytest --cov --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=90
+
+      - name: Coverage-rapport uploaden
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ github.sha }}
+          path: coverage.xml
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────
+  # Job 2 – Dependency security scan
+  # ────────────────────────────────────────────────────────────────
+  security-scan:
+    name: "Dependency security scan (pip-audit)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pip-audit
+      - name: Kwetsbaarheden scannen
+        run: >
+          pip-audit --progress-spinner off
+          -r requirements.txt -r requirements-ai.txt -r requirements-azure-sql.txt
+
+  # ────────────────────────────────────────────────────────────────
+  # Job 3 – Functionele acceptatietests (Robot Framework tegen draaiende API)
+  # ────────────────────────────────────────────────────────────────
+  functionele-tests:
+    name: "Functionele tests (Robot Framework)"
+    runs-on: ubuntu-latest
+    needs: kwaliteit
+    env:
+      AUTH_MODE: dev
+      DATABASE_URL: sqlite:///./output/robot.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Afhankelijkheden installeren
+        run: |
+          pip install -r requirements-dev.txt
+          pip install --no-deps -e .
+
+      - name: Database migreren en API starten
+        run: |
+          mkdir -p output/robot-results
+          alembic upgrade head
+          uvicorn --factory ledenadmin.main:create_app --port 8000 > output/robot-results/server.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health && break || sleep 1
+          done
+
+      - name: Robot Framework uitvoeren
+        run: >
+          robot --outputdir output/robot-results
+          --variable BASE_URL:http://127.0.0.1:8000
+          tests/functional
+
+      - name: Samenvatting publiceren
+        if: always()
+        run: |
+          python - <<'EOF'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          output = Path("output/robot-results/output.xml")
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if output.exists() and summary:
+              stat = ET.parse(output).getroot().find(".//statistics/total/stat")
+              passed, failed = int(stat.get("pass", 0)), int(stat.get("fail", 0))
+              icon = "✅" if failed == 0 else "❌"
+              with open(summary, "a", encoding="utf-8") as f:
+                  f.write(f"## {icon} Robot Framework: {passed} geslaagd, {failed} mislukt\n")
+          EOF
+
+      - name: Resultaten uploaden
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-resultaten-${{ github.sha }}
+          path: output/robot-results/
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────
+  # Job 4 – Docker image bouwen en container rooktest
+  # ────────────────────────────────────────────────────────────────
+  docker-build:
+    name: "Docker image bouwen & rooktest"
+    runs-on: ubuntu-latest
+    needs: [kwaliteit, security-scan]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image bouwen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Container starten en health controleren
+        run: |
+          docker run -d --name ledenadmin -p 8000:8000 \
+            -e APP_ENV=development -e AUTH_MODE=dev \
+            -e DATABASE_URL=sqlite:////tmp/ledenadmin.db \
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health && exit 0 || sleep 1
+          done
+          docker logs ledenadmin
+          exit 1
+
+      - name: ODBC-driver aanwezig in image
+        run: docker exec ledenadmin python -c "import pyodbc; assert any('18' in d for d in pyodbc.drivers()), pyodbc.drivers()"
+
+  # ────────────────────────────────────────────────────────────────
+  # Job 5 – Publiceren naar GitHub Container Registry (alleen main)
+  # ────────────────────────────────────────────────────────────────
+  docker-push:
+    name: "Image publiceren naar ghcr.io"
+    runs-on: ubuntu-latest
+    needs: [docker-build, functionele-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.image.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Image-naam bepalen
+        id: image
+        run: echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bouwen en pushen
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}:${{ github.sha }}
+            ${{ steps.image.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────────────────────────────
+  # Job 6 – Deploy naar Azure Container Apps (handmatig, alleen main)
+  #
+  # Vereiste GitHub Secrets (environment "production"):
+  #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID – OIDC federated credential
+  #   GHCR_PULL_TOKEN  – PAT (classic) met alleen read:packages, zodat Azure de image kan pullen
+  #   DATABASE_URL     – Azure SQL-verbinding (zie README)
+  # Optioneel: AI_PROVIDER, AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, ANTHROPIC_API_KEY
+  # Easy Auth (Entra ID) wordt eenmalig ingesteld; zie README "Deployment naar Azure".
+  # ────────────────────────────────────────────────────────────────
+  deploy-azure:
+    name: "Deploy naar Azure Container Apps"
+    runs-on: ubuntu-latest
+    needs: docker-push
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy_azure
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inloggen bij Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Resource group en Container Apps-omgeving
+        run: |
+          az extension add --name containerapp --upgrade --only-show-errors
+          az group show -n "$AZ_RESOURCE_GROUP" >/dev/null 2>&1 \
+            || az group create -n "$AZ_RESOURCE_GROUP" -l "$AZ_LOCATION" --tags project=ashab-al-jannah
+          az containerapp env show -n "$AZ_CONTAINER_APP_ENV" -g "$AZ_RESOURCE_GROUP" >/dev/null 2>&1 \
+            || az containerapp env create -n "$AZ_CONTAINER_APP_ENV" -g "$AZ_RESOURCE_GROUP" -l "$AZ_LOCATION"
+
+      - name: Container App aanmaken of bijwerken
+        env:
+          IMAGE: ${{ needs.docker-push.outputs.image }}:${{ github.sha }}
+          GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_PROVIDER: ${{ vars.AI_PROVIDER || 'local' }}
+          AI_MODEL: ${{ vars.AI_MODEL }}
+          OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+        run: |
+          set -euo pipefail
+          ENV_VARS=(APP_ENV=production AUTH_MODE=easyauth DATABASE_URL=secretref:database-url
+                    AI_PROVIDER="$AI_PROVIDER")
+          SECRETS=(database-url="$DATABASE_URL")
+          if [ -n "$AI_MODEL" ]; then ENV_VARS+=(AI_MODEL="$AI_MODEL"); fi
+          if [ -n "$OPENAI_BASE_URL" ]; then ENV_VARS+=(OPENAI_BASE_URL="$OPENAI_BASE_URL"); fi
+          if [ -n "$OPENAI_API_KEY" ]; then
+            SECRETS+=(openai-api-key="$OPENAI_API_KEY")
+            ENV_VARS+=(OPENAI_API_KEY=secretref:openai-api-key)
+          fi
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            SECRETS+=(anthropic-api-key="$ANTHROPIC_API_KEY")
+            ENV_VARS+=(ANTHROPIC_API_KEY=secretref:anthropic-api-key)
+          fi
+
+          if az containerapp show -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" >/dev/null 2>&1; then
+            az containerapp registry set -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+              --server ghcr.io --username "${{ github.repository_owner }}" --password "$GHCR_PULL_TOKEN"
+            az containerapp secret set -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" --secrets "${SECRETS[@]}"
+            az containerapp update -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+              --image "$IMAGE" --set-env-vars "${ENV_VARS[@]}"
+          else
+            az containerapp create -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+              --environment "$AZ_CONTAINER_APP_ENV" --image "$IMAGE" \
+              --registry-server ghcr.io --registry-username "${{ github.repository_owner }}" \
+              --registry-password "$GHCR_PULL_TOKEN" \
+              --secrets "${SECRETS[@]}" --env-vars "${ENV_VARS[@]}" \
+              --target-port 8000 --ingress external \
+              --cpu 0.5 --memory 1Gi --min-replicas 0 --max-replicas 2 \
+              --system-assigned \
+              --tags project=ashab-al-jannah
+          fi
+
+      - name: Publieke URL ophalen
+        run: |
+          FQDN=$(az containerapp show -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+                   --query properties.configuration.ingress.fqdn -o tsv)
+          echo "AZURE_URL=https://${FQDN}" >> "$GITHUB_ENV"
+          echo "## Live URL: https://${FQDN}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Rooktest op Azure
+        # Ruime wachttijd: scale-to-zero en het hervatten van Azure SQL (free offer) kosten tijd.
+        run: |
+          pip install -r requirements-dev.txt --quiet
+          robot --include smoke --outputdir output/robot-results-azure \
+            --variable BASE_URL:"$AZURE_URL" --variable HEALTH_TIMEOUT:300s tests/functional
+
+      - name: Rooktestresultaten uploaden
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: robot-resultaten-azure-${{ github.sha }}
+          path: output/robot-results-azure/
+          retention-days: 30
