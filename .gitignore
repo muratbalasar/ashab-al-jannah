@@ -11,3 +11,4 @@ output/
 *.db
 *.db-journal
 .env
+__git-token.txt
