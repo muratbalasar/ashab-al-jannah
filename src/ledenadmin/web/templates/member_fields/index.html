@@ -2,6 +2,7 @@
 {% from "macros.html" import field_error, invalid, csrf %}
 {% block title %}Ledenvelden – {{ app_name }}{% endblock %}
 {% block content %}
+<nav aria-label="Kruimelpad"><ul><li><a href="/leden">Leden</a></li><li>Ledenvelden</li></ul></nav>
 <hgroup>
   <h1>Ledenvelden</h1>
   <p>Extra velden die bij elk lid worden getoond, bijvoorbeeld een telefoonnummer of nieuwsbrief.</p>
@@ -11,7 +12,7 @@
   <h2>Nieuw veld</h2>
   <form method="post" action="/ledenvelden" novalidate>
     {{ csrf(csrf_token) }}
-    <div class="grid">
+    <div class="field-row">
       <label for="label">Naam
         <input id="label" name="label" type="text" required maxlength="100" autocomplete="off"
                placeholder="Bijv. Telefoon of Nieuwsbrief" value="{{ values.get('label', '') }}" {{ invalid(errors, 'label') }}>
@@ -25,7 +26,7 @@
         </select>
         {{ field_error(errors, 'field_type') }}
       </label>
-      <div class="filter-actions"><button type="submit">Veld toevoegen</button></div>
+      <button type="submit">Veld toevoegen</button>
     </div>
     <small>Gevoelige gegevens zoals BSN, ID-bewijs, gezondheid of geloof mogen niet worden vastgelegd (AVG) en worden geweigerd.</small>
   </form>
@@ -38,7 +39,7 @@
     <tbody>
       {% for f in fields %}
       <tr>
-        <td>{{ f.label }}</td>
+        <td>{{ f.label }}{% if is_sensitive(f.label) %} <span class="badge sensitive" title="Gevoelig persoonsgegeven: verborgen op het ledenformulier. Verwijder dit veld.">Gevoelig – verwijderen</span>{% endif %}</td>
         <td>{{ type_labels.get(f.field_type, f.field_type) }}</td>
         <td><span class="badge {{ 'actief' if f.is_active else 'inactief' }}">{{ 'Actief' if f.is_active else 'Inactief' }}</span></td>
         <td class="row-actions">

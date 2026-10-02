@@ -305,6 +305,28 @@ header + .report-section {
 
 /* ── Logboek ── */
 
+.badge.sensitive {
+  background: #ffd9d6;
+  color: #8a1c13;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  align-items: flex-start;
+}
+
+.field-row > label {
+  flex: 1 1 14rem;
+}
+
+.field-row > button {
+  width: auto;
+  margin-top: 1.85rem;
+  padding-inline: 1.25rem;
+}
+
 .row-actions {
   display: flex;
   gap: 1rem;

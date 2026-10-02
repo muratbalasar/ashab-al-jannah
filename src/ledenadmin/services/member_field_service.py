@@ -4,6 +4,7 @@ Gevoelige persoonsgegevens (zoals BSN) worden geblokkeerd: zowel als veldnaam al
 """
 
 import re
+import unicodedata
 from enum import StrEnum
 
 from sqlalchemy import delete, select
@@ -35,39 +36,48 @@ VALUE_MAX = 500
 BOOLEAN_TRUE = "ja"
 
 # Bijzondere/gevoelige persoonsgegevens (AVG art. 9/10, UAVG art. 46) horen hier niet.
-_SENSITIVE_WORDS = re.compile(r"\b(bsn|sofi|vog|cvv|pin|ras)\b")
-_SENSITIVE_PARTS = (
-    "burgerservice",
-    "sofinummer",
-    "paspoort",
-    "identiteitskaart",
-    "idkaart",
-    "rijbewijs",
-    "documentnummer",
-    "wachtwoord",
-    "password",
-    "pincode",
-    "creditcard",
-    "strafblad",
-    "strafrecht",
-    "medisch",
-    "gezondheid",
-    "ziekte",
-    "diagnose",
-    "religie",
-    "godsdienst",
-    "geloofsovertuiging",
-    "geaardheid",
-    "seksueel",
-    "seksuele",
-    "etniciteit",
-    "etnisch",
-    "afkomst",
-    "politiek",
-    "vakbond",
-    "biometrisch",
-    "vingerafdruk",
+# Hele woorden (kort/dubbelzinnig) en woorddelen; in NL, EN, TR, FR, DE en AR-transliteratie.
+_SENSITIVE_WORDS = re.compile(
+    r"\b(bsn|sofi|vog|cvv|cvc|pin|ras|race|id|ids|ssn|nin|tckn|tc|nik|din|"
+    r"geloof|religion|faith|mezhep|irk|dna|hiv|aids|iris|ziek|sick|"
+    r"politics|party|partij|union|parti|kimlik|pasaport|passport|pass|visa|visum|"
+    r"nationaliteit|nationality|uyruk|vatandaslik|jinsiya|hawiya)\b"
 )
+_SENSITIVE_PARTS = (
+    # Nationale identificatienummers en ID-bewijzen
+    "burgerservice", "sofinummer", "socialsecurity", "nationalid", "nationalnumber",
+    "rijksregister", "personalnummer", "personnummer", "steuerid", "tcno", "tckimlik",
+    "kimlik", "nufus", "identiteit", "identity", "identite", "ausweis", "idkaart",
+    "idcard", "idbewijs", "idnummer", "idnr", "paspoort", "passport", "pasaport",
+    "reisepass", "rijbewijs", "driverslicense", "drivinglicense", "ehliyet",
+    "documentnummer", "documentnumber", "verblijfsvergunning", "residencepermit",
+    "ikamet", "vreemdelingen", "vnummer", "nationaliteit", "nationality",
+    # Inlog- en betaalgeheimen
+    "wachtwoord", "password", "sifre", "pincode", "creditcard", "kredikarti",
+    "cardnumber", "kaartnummer", "cvv", "securitycode",
+    # Strafrechtelijk
+    "strafblad", "strafrecht", "veroordeling", "criminal", "conviction", "sabika",
+    # Gezondheid
+    "medisch", "medical", "gezondheid", "health", "saglik", "ziekte", "ziekten",
+    "disease", "hastalik", "diagnose", "diagnosis", "handicap", "beperking",
+    "disability", "engelli", "allergie", "allergy", "medicijn", "medicatie",
+    "medication", "ilac", "zwanger", "pregnan", "bloedgroep", "bloodtype", "kangrubu",
+    "psychisch", "mental", "verslaving", "addiction", "zorgverzeker", "insurancenumber",
+    # Geloof / levensovertuiging
+    "religie", "religion", "religieu", "godsdienst", "geloofs", "levensovertuiging",
+    "belief", "inanc", "mezhep", "sekte", "kerkgenootschap", "church",
+    # Ras, etniciteit, afkomst
+    "etnisch", "etnici", "ethnic", "afkomst", "herkomst", "ethnicorigin",
+    "huidskleur", "skincolor",
+    # Seksualiteit
+    "geaardheid", "orientation", "seksue", "sexual", "cinsel", "yonelim",
+    # Politiek en vakbond
+    "politiek", "political", "politik", "partijlid", "vakbond", "tradeunion",
+    "sendika",
+    # Biometrie / genetisch
+    "biometri", "vingerafdruk", "fingerprint", "parmakizi", "gezichtsherkenning",
+    "faceid", "genetisch", "genetic",
+)  # fmt: skip
 SENSITIVE_LABEL = (
     "Dit veld lijkt een gevoelig of bijzonder persoonsgegeven (zoals BSN, ID-bewijs, "
     "gezondheid of geloof). Dat mag niet worden vastgelegd (AVG)."
@@ -75,10 +85,17 @@ SENSITIVE_LABEL = (
 SENSITIVE_VALUE = "Dit lijkt een BSN. Een BSN mag niet worden opgeslagen (AVG)."
 
 
+def _plain(text: str) -> str:
+    """Kleine letters zonder accenten (ç→c, ş→s, ı→i, é→e) voor de controle."""
+    text = text.lower().replace("ı", "i")
+    return "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))
+
+
 def is_sensitive_label(label: str) -> bool:
-    lowered = label.lower()
+    lowered = _plain(label)
     compact = re.sub(r"[^a-z0-9]", "", lowered)
-    return bool(_SENSITIVE_WORDS.search(lowered)) or any(p in compact for p in _SENSITIVE_PARTS)
+    words = re.sub(r"[^a-z0-9]+", " ", lowered)
+    return bool(_SENSITIVE_WORDS.search(words)) or any(p in compact for p in _SENSITIVE_PARTS)
 
 
 def looks_like_bsn(value: str) -> bool:
@@ -150,7 +167,11 @@ class MemberFieldService:
         stmt = select(MemberField).order_by(MemberField.id)
         if not include_inactive:
             stmt = stmt.where(MemberField.is_active.is_(True))
-        return list(self._session.scalars(stmt))
+        fields = list(self._session.scalars(stmt))
+        # Velden van vóór de blokkade die toch gevoelig zijn, worden nooit meer getoond/ingevuld.
+        return (
+            fields if include_inactive else [f for f in fields if not is_sensitive_label(f.label)]
+        )
 
     def get(self, field_id: int) -> MemberField:
         field = self._session.get(MemberField, field_id)

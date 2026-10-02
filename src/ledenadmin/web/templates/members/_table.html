@@ -1,12 +1,14 @@
+{% set selectable = principal and principal.can(Permission.MEMBERS_DELETE) %}
 {% if members %}
 <div class="overflow-auto">
   <table class="striped">
     <thead>
-      <tr><th scope="col">Nr.</th><th scope="col">Naam</th><th scope="col">E-mail</th><th scope="col">Status</th></tr>
+      <tr>{% if selectable %}<th scope="col" class="select-col"><input type="checkbox" data-select-all aria-label="Alle zichtbare leden selecteren"></th>{% endif %}<th scope="col">Nr.</th><th scope="col">Naam</th><th scope="col">E-mail</th><th scope="col">Status</th></tr>
     </thead>
     <tbody data-paginate>
       {% for member in members %}
       <tr>
+        {% if selectable %}<td class="select-col"><input type="checkbox" name="ids" value="{{ member.id }}" data-select-row aria-label="{{ member.name }} selecteren"></td>{% endif %}
         <td>{{ member.id }}</td>
         <td><a href="/leden/{{ member.id }}">{{ member.name }}</a></td>
         <td>{{ member.email }}</td>

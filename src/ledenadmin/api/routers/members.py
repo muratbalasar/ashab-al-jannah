@@ -39,6 +39,17 @@ def update_member(
     return MemberRead.model_validate(services.members.update(member_id, data))
 
 
+@router.delete("/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_member(
+    member_id: int,
+    services: Services,
+    _: Annotated[Principal, Depends(require(Permission.MEMBERS_DELETE))],
+) -> None:
+    """Verwijdert het lid definitief, inclusief al zijn donaties."""
+    services.members.get(member_id)
+    services.members.delete_many([member_id])
+
+
 @router.get("/{member_id}/donations", response_model=list[DonationRead])
 def member_donations(
     member_id: int,

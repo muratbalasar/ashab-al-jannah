@@ -420,3 +420,53 @@ def test_beheerder_can_bulk_delete_donations(csrf_client, session) -> None:
     assert "Geen donaties gevonden." in csrf_client.get("/donaties").text
     bogus = csrf_client.get("/donaties?melding=donaties-verwijderd&aantal=<b>").text
     assert "donaties zijn verwijderd" not in bogus
+
+
+def test_beheerder_can_bulk_delete_members_with_donations(csrf_client, session) -> None:
+    from datetime import UTC, datetime
+
+    from factories import add_donation
+    from sqlalchemy import func, select
+
+    from ledenadmin.domain.models import Donation, Member
+
+    a = add_member(session, name="Lid A", email="a@x.nl")
+    b = add_member(session, name="Lid B", email="b@x.nl")
+    keep = add_member(session, name="Lid C", email="c@x.nl")
+    for member in (a, a, b, keep):
+        add_donation(session, member, "10", datetime(2026, 1, 1, tzinfo=UTC))
+
+    html = csrf_client.get("/leden", headers=BEHEERDER).text
+    assert "data-select-all" in html and html.count("data-select-row") == 3
+    data = {"ids": [a.id, b.id], "csrf_token": csrf_client.csrf}
+    for role in ("penningmeester", "bestuurder"):
+        headers = {"X-Dev-Roles": role}
+        assert "data-select-row" not in csrf_client.get("/leden", headers=headers).text
+        refused = csrf_client.post("/leden/verwijderen", data=data, headers=headers)
+        assert refused.status_code == 403
+
+    response = csrf_client.post("/leden/verwijderen", data=data, headers=BEHEERDER)
+
+    assert "2 leden zijn verwijderd, samen met 3 donatie(s)." in response.text
+    session.expire_all()
+    assert session.scalar(select(func.count(Member.id))) == 1
+    assert session.scalar(select(func.count(Donation.id))) == 1
+    assert csrf_client.delete(f"/api/v1/members/{keep.id}").status_code == 204
+    assert csrf_client.delete(f"/api/v1/members/{keep.id}").status_code == 404
+    assert session.scalar(select(func.count(Donation.id))) == 0
+
+
+def test_donations_list_filters_on_member(client, session) -> None:
+    from datetime import UTC, datetime
+
+    from factories import add_donation
+
+    a = add_member(session, name="Filter A", email="fa@x.nl")
+    b = add_member(session, name="Filter B", email="fb@x.nl")
+    add_donation(session, a, "10", datetime(2026, 1, 1, tzinfo=UTC))
+    add_donation(session, b, "20", datetime(2026, 1, 2, tzinfo=UTC))
+
+    html = client.get(f"/donaties?member_id={a.id}", headers=BEHEERDER).text
+    assert 'data-member-search="member_id"' in html
+    assert html.count('href="/leden/') == 1 and "€ 10,00" in html and "€ 20,00" not in html
+    assert client.get("/donaties?member_id=x", headers=BEHEERDER).text.count("data-select-row") == 2
