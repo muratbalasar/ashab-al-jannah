@@ -25,7 +25,7 @@ class MemberService:
         self,
         text: str | None = None,
         status: MemberStatus | None = None,
-        limit: int = 50,
+        limit: int | None = 50,
         offset: int = 0,
     ) -> list[Member]:
         return self._members.search(text=text, status=status, limit=limit, offset=offset)

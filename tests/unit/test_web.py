@@ -2,6 +2,9 @@ import re
 
 from factories import add_member
 
+from ledenadmin.domain.enums import MemberStatus
+from ledenadmin.domain.models import Member
+
 
 def test_pages_render_with_security_headers(client) -> None:
     pages = ("/", "/leden", "/leden/nieuw", "/donaties", "/donaties/nieuw", "/rapportage")
@@ -27,6 +30,14 @@ def test_navigation_follows_role(client) -> None:
     assert 'href="/rapportage"' in html
     assert 'href="/leden"' not in html
     assert client.get("/leden", headers={"X-Dev-Roles": "bestuurder"}).status_code == 403
+
+
+def test_home_redirects_to_report(client) -> None:
+    response = client.get("/", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/rapportage"
+    assert "<h1>Rapportage</h1>" in client.get("/").text
 
 
 def test_post_without_csrf_token_is_rejected(client) -> None:
@@ -299,3 +310,113 @@ def test_rename_and_deactivate_subcategory_via_form(csrf_client) -> None:
     form = csrf_client.get("/donaties/nieuw").text
     assert "Sponsoring – MKB" not in form and "Sponsoring – Bedrijven" not in form
     assert "Sponsoring – Particulier" in form
+
+
+def test_member_pickers_have_search_and_list_all_members(client, session) -> None:
+    session.add_all(
+        Member(name=f"Lid {n:04d}", email=f"lid{n}@example.nl", status=MemberStatus.ACTIVE)
+        for n in range(600)
+    )
+    session.commit()
+    session.add(Member(name="Ayşe Öztürk", email="ayse@example.nl"))
+    session.commit()
+
+    for path in ("/rapportage", "/donaties/nieuw"):
+        html = client.get(path).text
+        assert 'data-member-search="member_id"' in html, path
+        assert html.count('data-zoek="lid') == 600, path
+        assert 'data-zoek="ayse@example.nl"' in html and "Ayşe Öztürk (" in html, path
+
+
+def test_report_preselects_member_from_link(client, session) -> None:
+    member = add_member(session)
+
+    html = client.get(f"/rapportage?member_id={member.id}").text
+
+    assert f'<option value="{member.id}" data-zoek="jan@example.nl" selected>' in html
+
+
+def test_report_offers_pdf_export_with_print_header(client, session) -> None:
+    from datetime import UTC, datetime
+
+    from ledenadmin.dummy_data import seed
+
+    seed(session, now=datetime(2026, 6, 30, tzinfo=UTC))
+
+    html = client.get("/rapportage?start_date=01-01-2025&end_date=30-06-2026").text
+    empty = client.get("/rapportage?start_date=01-01-2000&end_date=31-12-2000").text
+
+    assert "data-print-report" in html and "Exporteer PDF" in html
+    assert 'class="print-only print-head"' in html
+    assert "<p data-print-filters>Periode 01-01-2025 t/m 30-06-2026</p>" in html
+    assert "data-print-report" not in empty
+
+
+def test_delete_button_only_for_unused_and_delete_works(csrf_client, session) -> None:
+    from datetime import UTC, datetime
+
+    from factories import add_donation, subcategory
+
+    add_donation(session, add_member(session), "10", datetime(2026, 1, 1, tzinfo=UTC))
+    mkb = subcategory(session, "Sponsoring", "MKB")
+    particulier = subcategory(session, "Sponsoring", "Particulier")
+    html = csrf_client.get("/categorieen", headers=BEHEERDER).text
+
+    assert f'id="verwijder-sub-{mkb.id}"' not in html
+    assert f'id="verwijder-cat-{mkb.category_id}"' not in html
+    assert f'id="verwijder-sub-{particulier.id}"' in html
+    assert "hx-confirm=" in html
+
+    base = f"/categorieen/{mkb.category_id}/subcategorieen"
+    data = {"csrf_token": csrf_client.csrf}
+    hx = {**BEHEERDER, "HX-Request": "true"}
+    refused = csrf_client.post(f"{base}/{mkb.id}/verwijderen", data=data, headers=hx)
+    deleted = csrf_client.post(f"{base}/{particulier.id}/verwijderen", data=data, headers=hx)
+
+    assert refused.status_code == 409 and "al gebruikt bij donaties" in refused.text
+    assert deleted.status_code == 200 and "Verwijderd." in deleted.text
+    assert "Particulier" not in deleted.text
+    api = csrf_client.delete(f"/api/v1/categories/{category_id(csrf_client, 'Donatie')}")
+    assert api.status_code == 204
+    other = csrf_client.delete(
+        f"/api/v1/categories/{mkb.category_id}", headers={"X-Dev-Roles": "penningmeester"}
+    )
+    assert other.status_code == 403
+
+
+def test_beheerder_can_bulk_delete_donations(csrf_client, session) -> None:
+    from datetime import UTC, datetime
+
+    from factories import add_donation
+
+    member = add_member(session)
+    ids = [
+        add_donation(session, member, str(n), datetime(2026, 1, n, tzinfo=UTC)).id
+        for n in (1, 2, 3)
+    ]
+    html = csrf_client.get("/donaties", headers=BEHEERDER).text
+    assert "data-select-all" in html and html.count("data-select-row") == 3
+    for role in ("penningmeester", "bestuurder"):
+        headers = {"X-Dev-Roles": role}
+        if role == "penningmeester":
+            assert "data-select-row" not in csrf_client.get("/donaties", headers=headers).text
+        refused = csrf_client.post(
+            "/donaties/verwijderen",
+            data={"ids": ids, "csrf_token": csrf_client.csrf},
+            headers=headers,
+        )
+        assert refused.status_code == 403
+
+    response = csrf_client.post(
+        "/donaties/verwijderen",
+        data={"ids": ids[:2], "csrf_token": csrf_client.csrf},
+        headers=BEHEERDER,
+    )
+
+    assert "2 donaties zijn verwijderd." in response.text
+    assert response.text.count("data-select-row") == 1
+    assert csrf_client.delete(f"/api/v1/donations/{ids[2]}").status_code == 204
+    assert csrf_client.delete(f"/api/v1/donations/{ids[2]}").status_code == 404
+    assert "Geen donaties gevonden." in csrf_client.get("/donaties").text
+    bogus = csrf_client.get("/donaties?melding=donaties-verwijderd&aantal=<b>").text
+    assert "donaties zijn verwijderd" not in bogus

@@ -64,3 +64,17 @@ def update_subcategory(
         category_id, subcategory_id, data.name, data.is_active
     )
     return SubcategoryRead.model_validate(subcategory)
+
+
+@router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_category(category_id: int, services: Services, _: CanWrite) -> None:
+    services.categories.delete_category(category_id)
+
+
+@router.delete(
+    "/{category_id}/subcategories/{subcategory_id}", status_code=status.HTTP_204_NO_CONTENT
+)
+def delete_subcategory(
+    category_id: int, subcategory_id: int, services: Services, _: CanWrite
+) -> None:
+    services.categories.delete_subcategory(category_id, subcategory_id)

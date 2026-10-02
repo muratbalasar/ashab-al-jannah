@@ -102,3 +102,20 @@ class Donation(TimestampMixin, Base):
     @property
     def category(self) -> Category:
         return self.subcategory.category
+
+
+class AuditLog(Base):
+    """Logboek van alle gebruikersacties (aanmelden, bekijken, klikken, wijzigen, verwijderen)."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False, index=True)
+    user: Mapped[str] = mapped_column(Unicode(200), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(Unicode(20), nullable=False, index=True)
+    method: Mapped[str] = mapped_column(Unicode(10), nullable=False)
+    path: Mapped[str] = mapped_column(Unicode(500), nullable=False)
+    status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    detail: Mapped[str | None] = mapped_column(Unicode(2000), nullable=True)
+    ip: Mapped[str | None] = mapped_column(Unicode(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Unicode(300), nullable=True)

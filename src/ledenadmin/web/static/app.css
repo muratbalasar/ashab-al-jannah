@@ -86,8 +86,48 @@ header nav ul:last-child {
 }
 
 /* Pico maakt zoekvelden een ronde pil (--pico-border-radius: 5rem); gelijk trekken met de andere velden */
-.member-filter input[type="search"] {
+.member-filter input[type="search"],
+.member-search {
   --pico-border-radius: 0.25rem;
+}
+
+/* ── Ledenkeuze met zoekveld ── */
+
+.member-picker {
+  margin-bottom: var(--pico-spacing);
+}
+
+.member-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 0.75rem;
+}
+
+.member-picker-row > input.member-search,
+.member-picker-row > select {
+  margin-bottom: 0;
+}
+
+.member-picker-row > [hidden] {
+  display: none;
+}
+
+.member-picker-row:has(> [hidden]) {
+  grid-template-columns: 1fr;
+}
+
+.member-count {
+  display: block;
+  min-height: 1.25em;
+  margin-top: 0.25rem;
+  color: var(--pico-muted-color);
+}
+
+@media (max-width: 576px) {
+  .member-picker-row {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
 }
 
 .kpi {
@@ -160,6 +200,148 @@ header + .report-section {
 .report-section.grid {
   row-gap: 1.75rem;
 }
+
+.export-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+/* ── PDF-export (printweergave van het rapport) ── */
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+    --pico-font-size: 85%;
+  }
+
+  body > header,
+  main > h1,
+  main > section,
+  #report-filter,
+  .export-links,
+  .page-head,
+  .skip-link,
+  .notice {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block;
+  }
+
+  .print-head h1 {
+    margin-bottom: 0.25rem;
+    font-size: 1.5rem;
+  }
+
+  .print-head p {
+    margin-bottom: 0.5rem;
+    color: #555;
+  }
+
+  main.container {
+    max-width: none;
+    padding: 0;
+  }
+
+  #rapport article {
+    box-shadow: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: none;
+  }
+
+  .report-section {
+    padding-block: 1rem;
+  }
+
+  /* Kerncijfers en grafieken heel houden; lange tabellen mogen over pagina's lopen. */
+  section.report-section,
+  figure {
+    break-inside: avoid;
+  }
+
+  .report-section h3 {
+    break-after: avoid;
+  }
+
+  .report-section.grid {
+    display: block;
+  }
+
+  .report-section.grid > * + * {
+    margin-top: 1.25rem;
+  }
+
+  .grid.charts,
+  .grid.kpis {
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  }
+
+  .chart-box {
+    height: 12rem;
+    overflow: hidden;
+  }
+
+  .chart-box canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  details > summary::after {
+    display: none;
+  }
+
+  tr {
+    break-inside: avoid;
+  }
+}
+
+/* ── Logboek ── */
+
+.show-more {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.audit-table td {
+  font-size: 0.875rem;
+  vertical-align: top;
+}
+
+.audit-table code {
+  white-space: nowrap;
+  font-size: 0.8rem;
+}
+
+.audit-detail {
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+  color: var(--pico-muted-color);
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.audit-action {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 1rem;
+  font-size: 0.78rem;
+  background: var(--pico-muted-border-color);
+}
+
+.audit-aanmelding { background: #d7ecff; color: #0b4a80; }
+.audit-wijziging { background: #fff1c2; color: #6b4e00; }
+.audit-verwijdering { background: #ffd9d6; color: #8a1c13; }
 
 .insight-text {
   white-space: pre-line;
@@ -286,6 +468,56 @@ button.link-action {
 
 .link-action.muted {
   color: var(--pico-muted-color);
+}
+
+.link-action.danger {
+  color: var(--pico-del-color, #c62828);
+}
+
+/* ── Selectie in tabellen (donaties verwijderen) ── */
+
+.select-col {
+  width: 2.5rem;
+  padding-inline-end: 0;
+}
+
+.select-col input[type="checkbox"] {
+  margin: 0;
+}
+
+tr.is-selected > * {
+  background-color: color-mix(in srgb, var(--pico-primary) 12%, transparent) !important;
+}
+
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-card-sectioning-background-color);
+  border: 1px solid var(--pico-muted-border-color);
+}
+
+.bulk-bar[hidden] {
+  display: none;
+}
+
+.bulk-bar button {
+  width: auto;
+  margin: 0;
+  padding: 0.35rem 1rem;
+}
+
+.danger-button {
+  --pico-background-color: #c62828;
+  --pico-border-color: #c62828;
+  --pico-color: #fff;
 }
 
 /* Vaste breedte zodat "Wijzigen" uitlijnt, of er nu Activeren of Deactiveren staat */

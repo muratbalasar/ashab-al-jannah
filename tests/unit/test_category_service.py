@@ -80,3 +80,29 @@ def test_rename_conflicts_and_wrong_parent(session) -> None:
         service.update_subcategory(contributie.id, mkb.id, is_active=False)
     with pytest.raises(NotFoundError):
         service.update_category(999, is_active=False)
+
+
+def test_delete_only_when_unused(session) -> None:
+    from datetime import UTC, datetime
+
+    from factories import add_donation, add_member, subcategory
+
+    service = CategoryService(session)
+    add_donation(session, add_member(session), "10", datetime(2026, 1, 1, tzinfo=UTC))
+    mkb = subcategory(session, "Sponsoring", "MKB")
+    particulier = subcategory(session, "Sponsoring", "Particulier")
+    donatie = next(c for c in service.list() if c.name == "Donatie")
+
+    with pytest.raises(ConflictError, match="al gebruikt"):
+        service.delete_subcategory(mkb.category_id, mkb.id)
+    with pytest.raises(ConflictError, match="al gebruikt"):
+        service.delete_category(mkb.category_id)
+    with pytest.raises(NotFoundError):
+        service.delete_subcategory(donatie.id, particulier.id)
+
+    service.delete_subcategory(particulier.category_id, particulier.id)
+    service.delete_category(donatie.id)
+
+    names = {c.name: [s.name for s in c.subcategories] for c in service.list(True)}
+    assert "Donatie" not in names
+    assert names["Sponsoring"] == ["MKB"]

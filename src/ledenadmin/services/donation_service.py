@@ -36,7 +36,7 @@ class DonationService:
             raise NotFoundError(f"Donatie {donation_id} bestaat niet")
         return donation
 
-    def recent(self, limit: int = 50, member_id: int | None = None) -> list[Donation]:
+    def recent(self, limit: int | None = 50, member_id: int | None = None) -> list[Donation]:
         return self._donations.find(DonationQuery(member_id=member_id), limit=limit)
 
     def register(self, data: DonationCreate, actor: str) -> Donation:
@@ -65,6 +65,12 @@ class DonationService:
         self._donations.add(donation)
         self._session.commit()
         return self.get(donation.id)
+
+    def delete_many(self, donation_ids: list[int]) -> int:
+        """Verwijdert donaties definitief; onbekende ID's worden genegeerd."""
+        count = self._donations.delete_many(donation_ids)
+        self._session.commit()
+        return count
 
     def _resolve_timestamp(self, value: datetime | None) -> datetime:
         now = self._clock()

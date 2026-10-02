@@ -4,7 +4,7 @@
     <thead>
       <tr><th scope="col">Nr.</th><th scope="col">Naam</th><th scope="col">E-mail</th><th scope="col">Status</th></tr>
     </thead>
-    <tbody>
+    <tbody data-paginate>
       {% for member in members %}
       <tr>
         <td>{{ member.id }}</td>

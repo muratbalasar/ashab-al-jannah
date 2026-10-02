@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from ledenadmin import APP_NAME, APP_TAGLINE, __version__
 from ledenadmin.api.errors import register_error_handlers
 from ledenadmin.api.routers import categories, donations, members, reports, system
+from ledenadmin.audit import AuditMiddleware
 from ledenadmin.auth.providers import build_auth_provider
 from ledenadmin.config import Settings, get_settings
 from ledenadmin.db import Database
@@ -48,6 +49,7 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.state.insights = InsightService(build_insight_provider(settings))
     app.state.templates = build_templates(settings.tz)
 
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(SecurityMiddleware, secure_cookies=settings.is_production)
     register_error_handlers(app)
 

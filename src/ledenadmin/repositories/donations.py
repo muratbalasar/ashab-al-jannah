@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, delete, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ledenadmin.domain.models import Donation, Subcategory
@@ -40,6 +40,12 @@ class DonationRepository:
 
     def count(self) -> int:
         return self._session.scalar(select(func.count(Donation.id))) or 0
+
+    def delete_many(self, donation_ids: list[int]) -> int:
+        if not donation_ids:
+            return 0
+        result = self._session.execute(delete(Donation).where(Donation.id.in_(donation_ids)))
+        return result.rowcount or 0
 
     @staticmethod
     def _with_relations(stmt: Select) -> Select:

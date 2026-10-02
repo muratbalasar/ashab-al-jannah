@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from ledenadmin.domain.models import Category, Subcategory
+from ledenadmin.domain.models import Category, Donation, Subcategory
 
 
 class CategoryRepository:
@@ -35,3 +35,11 @@ class CategoryRepository:
     def add(self, entity: Category | Subcategory) -> None:
         self._session.add(entity)
         self._session.flush()
+
+    def delete(self, entity: Category | Subcategory) -> None:
+        self._session.delete(entity)
+        self._session.flush()
+
+    def used_subcategory_ids(self) -> set[int]:
+        """Subcategorieën waar al donaties op geboekt zijn (die mogen niet weg)."""
+        return set(self._session.scalars(select(Donation.subcategory_id).distinct()))
