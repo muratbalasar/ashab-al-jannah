@@ -1,9 +1,10 @@
+from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ledenadmin.domain.enums import MemberStatus
 from ledenadmin.domain.errors import ConflictError, NotFoundError
-from ledenadmin.domain.models import Member
+from ledenadmin.domain.models import Donation, Member, MemberFieldValue
 from ledenadmin.repositories.members import MemberRepository
 from ledenadmin.schemas.members import MemberCreate, MemberUpdate
 
@@ -46,6 +47,23 @@ class MemberService:
             setattr(member, field, value)
         self._commit()
         return member
+
+    def delete_many(self, member_ids: list[int]) -> tuple[int, int]:
+        """Verwijdert leden definitief, inclusief hun donaties en extra veldwaarden.
+
+        Geeft (aantal leden, aantal donaties) terug; onbekende ID's worden genegeerd.
+        """
+        if not member_ids:
+            return 0, 0
+        donations = self._session.execute(
+            delete(Donation).where(Donation.member_id.in_(member_ids))
+        ).rowcount
+        self._session.execute(
+            delete(MemberFieldValue).where(MemberFieldValue.member_id.in_(member_ids))
+        )
+        members = self._session.execute(delete(Member).where(Member.id.in_(member_ids))).rowcount
+        self._session.commit()
+        return members or 0, donations or 0
 
     def _ensure_email_free(self, email: str) -> None:
         if self._members.get_by_email(email) is not None:

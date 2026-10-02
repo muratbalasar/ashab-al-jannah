@@ -15,6 +15,7 @@ class Role(StrEnum):
 class Permission(StrEnum):
     MEMBERS_READ = "members:read"
     MEMBERS_WRITE = "members:write"
+    MEMBERS_DELETE = "members:delete"
     DONATIONS_READ = "donations:read"
     DONATIONS_WRITE = "donations:write"
     DONATIONS_DELETE = "donations:delete"

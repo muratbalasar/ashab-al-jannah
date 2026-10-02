@@ -18,7 +18,11 @@ from ledenadmin.schemas.categories import CategoryCreate
 from ledenadmin.schemas.donations import DonationCreate, DonationRead
 from ledenadmin.schemas.members import MemberCreate, MemberUpdate
 from ledenadmin.schemas.reports import Report, ReportFilter
-from ledenadmin.services.member_field_service import FIELD_TYPE_LABELS, FieldType
+from ledenadmin.services.member_field_service import (
+    FIELD_TYPE_LABELS,
+    FieldType,
+    is_sensitive_label,
+)
 from ledenadmin.web.dates import nl_date_to_iso, nl_datetime_to_iso
 from ledenadmin.web.security import verify_csrf
 
@@ -27,6 +31,8 @@ router = APIRouter(dependencies=[Depends(verify_csrf)], include_in_schema=False)
 MESSAGES = {
     "lid-aangemaakt": "Het lid is aangemaakt.",
     "lid-bijgewerkt": "Het lid is bijgewerkt.",
+    "lid-verwijderd": "Het lid is verwijderd, samen met {donaties} donatie(s).",
+    "leden-verwijderd": "{aantal} leden zijn verwijderd, samen met {donaties} donatie(s).",
     "donatie-geregistreerd": "De donatie is geregistreerd.",
     "donatie-verwijderd": "De donatie is verwijderd.",
     "donaties-verwijderd": "{aantal} donaties zijn verwijderd.",
@@ -69,9 +75,12 @@ def render(
     request: Request, template: str, context: dict[str, Any] | None = None, status_code: int = 200
 ) -> Response:
     melding = MESSAGES.get(request.query_params.get("melding", ""))
-    aantal = request.query_params.get("aantal", "")
-    if melding and "{aantal}" in melding:
-        melding = melding.format(aantal=int(aantal)) if aantal.isdigit() else None
+    if melding and "{" in melding:
+        numbers = {k: request.query_params.get(k, "") for k in ("aantal", "donaties")}
+        try:
+            melding = melding.format(**{k: int(v) for k, v in numbers.items() if v.isdigit()})
+        except KeyError:
+            melding = None
     base = {
         "principal": getattr(request.state, "principal", None),
         "csrf_token": request.state.csrf_token,
@@ -173,6 +182,18 @@ def members_list(
     context = {"members": members, "q": q, "status": status}
     template = "members/_table.html" if is_partial(request) else "members/list.html"
     return render(request, template, context)
+
+
+@router.post("/leden/verwijderen")
+def members_delete(
+    services: Services,
+    _: _perm(Permission.MEMBERS_DELETE),
+    ids: Annotated[list[int] | None, Form()] = None,
+) -> Response:
+    members, donations = services.members.delete_many(ids or [])
+    melding = "lid-verwijderd" if members == 1 else "leden-verwijderd"
+    query = urlencode({"melding": melding, "aantal": members, "donaties": donations})
+    return RedirectResponse(f"/leden?{query}", status_code=303)
 
 
 @router.get("/leden/nieuw")
@@ -290,6 +311,7 @@ def _fields_page(
     context = {
         "fields": services.member_fields.list(include_inactive=True),
         "type_labels": FIELD_TYPE_LABELS,
+        "is_sensitive": is_sensitive_label,
         "values": values or {"field_type": FieldType.TEXT},
         "errors": errors or {},
     }
@@ -363,10 +385,19 @@ def audit_index(
 
 @router.get("/donaties")
 def donations_list(
-    request: Request, services: Services, _: _perm(Permission.DONATIONS_READ)
+    request: Request,
+    services: Services,
+    _: _perm(Permission.DONATIONS_READ),
+    member_id: str = "",
 ) -> Response:
-    donations = [DonationRead.from_entity(d) for d in services.donations.recent(None)]
-    return render(request, "donations/list.html", {"donations": donations})
+    selected = int(member_id) if member_id.isdigit() else None
+    donations = [DonationRead.from_entity(d) for d in services.donations.recent(None, selected)]
+    context = {
+        "donations": donations,
+        "member_id": str(selected or ""),
+        "members": services.members.search(limit=MEMBER_PICKER_LIMIT),
+    }
+    return render(request, "donations/list.html", context)
 
 
 def _donation_form(request, services, values, errors, status_code=200) -> Response:

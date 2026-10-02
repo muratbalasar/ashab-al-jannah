@@ -1,13 +1,22 @@
 {% extends "base.html" %}
-{% from "macros.html" import csrf %}
+{% from "macros.html" import csrf, member_picker %}
 {% block title %}Donaties – {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <h1>Recente donaties</h1>
   {% if principal.can(Permission.DONATIONS_WRITE) %}<a role="button" href="/donaties/nieuw">Donatie registreren</a>{% endif %}
 </div>
-{% if principal.can(Permission.DONATIONS_DELETE) and donations %}
-<form id="donaties-selectie" method="post" action="/donaties/verwijderen" data-bulk-select>
+<search aria-label="Donaties filteren">
+<form class="donation-filter" action="/donaties" method="get"
+      hx-get="/donaties" hx-target="#donaties-lijst" hx-select="#donaties-lijst" hx-swap="outerHTML"
+      hx-push-url="true" hx-trigger="change from:#member_id">
+  {{ member_picker("member_id", "Lid", members, member_id, "Alle leden") }}
+  <noscript><button type="submit">Filteren</button></noscript>
+</form>
+</search>
+
+<div id="donaties-lijst">{% if principal.can(Permission.DONATIONS_DELETE) and donations %}
+<form id="donaties-selectie" method="post" action="/donaties/verwijderen" data-bulk-select data-one="donatie" data-this="deze donatie" data-many="donaties">
   {{ csrf(csrf_token) }}
   <div class="bulk-bar" hidden>
     <span data-bulk-count aria-live="polite"></span>
@@ -18,4 +27,5 @@
 {% else %}
 {% with donations=donations, hide_member=False %}{% include "donations/_table.html" %}{% endwith %}
 {% endif %}
+</div>
 {% endblock %}

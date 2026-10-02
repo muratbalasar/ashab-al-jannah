@@ -14,13 +14,22 @@ BEHEERDER = {"X-Dev-Roles": "beheerder"}
 @pytest.mark.parametrize(
     "label",
     ["BSN", "bsn-nummer", "Burgerservicenummer", "Sofi nummer", "Paspoortnummer", "Religie",
-     "Medische info", "ID-kaart nr", "Wachtwoord"],
+     "Medische info", "ID-kaart nr", "Wachtwoord", "Geloof", "ID", "Kimlik", "Passport",
+     "Kimlik no", "TC Kimlik", "Pasaport", "Rijbewijs", "Nationaliteit", "Health",
+     "Sağlık durumu", "Allergieën", "Handicap", "Mezhep", "Vakbond", "Politieke partij",
+     "Strafblad", "Fingerprint", "Bloedgroep", "Etniciteit", "SSN", "Creditcard",
+     "Ehliyet", "Identity number", "Verblijfsvergunning", "Seksuele geaardheid"],
 )  # fmt: skip
 def test_sensitive_labels_are_blocked(label: str) -> None:
     assert is_sensitive_label(label)
 
 
-@pytest.mark.parametrize("label", ["Telefoon", "IBAN", "Nieuwsbrief", "Adres", "Huisnummer"])
+@pytest.mark.parametrize(
+    "label",
+    ["Telefoon", "IBAN", "Nieuwsbrief", "Adres", "Huisnummer", "Cep", "Mobile", "Straat",
+     "Woonplaats", "Postcode", "Sector", "Beroep", "Lid sinds", "Opmerking", "Kinderen",
+     "Geboortedatum", "Video", "Provincie", "Email werk", "Bank"],
+)  # fmt: skip
 def test_normal_labels_are_allowed(label: str) -> None:
     assert not is_sensitive_label(label)
 
@@ -90,3 +99,10 @@ def test_admin_manages_fields_and_member_values(csrf_client, session) -> None:
 def test_fields_page_only_for_beheerder(client) -> None:
     for role in ("penningmeester", "bestuurder"):
         assert client.get("/ledenvelden", headers={"X-Dev-Roles": role}).status_code == 403
+        assert 'href="/ledenvelden"' not in client.get("/leden", headers={"X-Dev-Roles": role}).text
+
+
+def test_fields_link_on_members_page_not_in_main_nav(client) -> None:
+    html = client.get("/leden", headers=BEHEERDER).text
+    assert html.count('href="/ledenvelden"') == 1
+    assert 'href="/ledenvelden"' not in client.get("/donaties", headers=BEHEERDER).text

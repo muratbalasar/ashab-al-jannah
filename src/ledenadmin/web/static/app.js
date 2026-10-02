@@ -86,7 +86,7 @@
     const bar = form.querySelector(".bulk-bar");
     bar.hidden = checked.length === 0;
     form.querySelector("[data-bulk-count]").textContent =
-      checked.length === 1 ? "1 donatie geselecteerd" : `${checked.length} donaties geselecteerd`;
+      `${checked.length} ${checked.length === 1 ? form.dataset.one : form.dataset.many} geselecteerd`;
     return checked.length;
   }
 
@@ -107,8 +107,9 @@
       const form = event.target;
       if (!form.matches("form[data-bulk-select]")) return;
       const count = updateBulk(form);
-      const what = count === 1 ? "deze donatie" : `deze ${count} donaties`;
-      if (!count || !window.confirm(`Weet je zeker dat je ${what} definitief wilt verwijderen?`)) {
+      const what = count === 1 ? form.dataset.this : `deze ${count} ${form.dataset.many}`;
+      const extra = form.dataset.confirmExtra ? `\n\n${form.dataset.confirmExtra}` : "";
+      if (!count || !window.confirm(`Weet je zeker dat je ${what} definitief wilt verwijderen?${extra}`)) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -400,5 +401,6 @@
   document.addEventListener("htmx:afterSettle", function (event) {
     renderCharts(event.target);
     initPaging(document);
+    document.querySelectorAll("form[data-bulk-select]").forEach(updateBulk);
   });
 })();

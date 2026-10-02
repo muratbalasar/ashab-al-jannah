@@ -106,6 +106,7 @@ Principes:
 | Donaties inzien | ✔ | ✔ | |
 | Donaties registreren | ✔ | ✔ | |
 | Donaties verwijderen | ✔ | | |
+| Leden verwijderen (inclusief hun donaties) | ✔ | | |
 | Categorieën en subcategorieën beheren | ✔ | | |
 | Rapportage (totalen, grafieken) | ✔ | ✔ | ✔ |
 | Rapportage per lid / met namen | ✔ | ✔ | |

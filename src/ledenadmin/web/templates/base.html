@@ -30,7 +30,6 @@
         {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="/donaties">Donaties</a></li>{% endif %}
         {% if principal.can(Permission.REPORTS_READ) %}<li><a href="/rapportage">Rapportage</a></li>{% endif %}
         {% if principal.can(Permission.CATEGORIES_WRITE) %}<li><a href="/categorieen">Categorieën</a></li>{% endif %}
-        {% if principal.can(Permission.MEMBER_FIELDS_WRITE) %}<li><a href="/ledenvelden">Ledenvelden</a></li>{% endif %}
         {% if principal.can(Permission.AUDIT_READ) %}<li><a href="/logboek">Logboek</a></li>{% endif %}
         <li><small title="Aangemeld als">{{ principal.name }}</small></li>
       </ul>
