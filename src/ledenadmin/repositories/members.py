@@ -24,7 +24,7 @@ class MemberRepository:
         self,
         text: str | None = None,
         status: MemberStatus | None = None,
-        limit: int = 100,
+        limit: int | None = 100,
         offset: int = 0,
     ) -> list[Member]:
         stmt = select(Member)

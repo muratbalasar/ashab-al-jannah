@@ -87,6 +87,43 @@ class CategoryService:
         self._commit(f"Subcategorie '{name}' bestaat al")
         return subcategory
 
+    def used_subcategory_ids(self) -> set[int]:
+        return self._categories.used_subcategory_ids()
+
+    def delete_category(self, category_id: int) -> None:
+        """Verwijdert een categorie met haar subcategorieën, maar alleen zonder donaties."""
+        category = self.get_category(category_id)
+        used = self.used_subcategory_ids()
+        if any(s.id in used for s in category.subcategories):
+            raise ConflictError(
+                f"Categorie '{category.name}' is al gebruikt bij donaties; deactiveer haar."
+            )
+        for subcategory in list(category.subcategories):
+            self._categories.delete(subcategory)
+        self._categories.delete(category)
+        self._commit_delete(category.name)
+
+    def delete_subcategory(self, category_id: int, subcategory_id: int) -> None:
+        subcategory = self.get_subcategory(subcategory_id)
+        if subcategory.category_id != category_id:
+            raise NotFoundError(
+                f"Subcategorie {subcategory_id} hoort niet bij categorie {category_id}"
+            )
+        if subcategory.id in self.used_subcategory_ids():
+            raise ConflictError(
+                f"Subcategorie '{subcategory.name}' is al gebruikt bij donaties; deactiveer haar."
+            )
+        self._categories.delete(subcategory)
+        self._commit_delete(subcategory.name)
+
+    def _commit_delete(self, name: str) -> None:
+        # De database (RESTRICT) blijft de laatste vangnet als er net een donatie bij kwam.
+        try:
+            self._session.commit()
+        except IntegrityError as exc:
+            self._session.rollback()
+            raise ConflictError(f"'{name}' is al gebruikt bij donaties; deactiveer haar.") from exc
+
     def ensure_defaults(self) -> bool:
         """Vult standaardcategorieën als er nog geen categorieën zijn. Idempotent."""
         if self._categories.list(include_inactive=True):

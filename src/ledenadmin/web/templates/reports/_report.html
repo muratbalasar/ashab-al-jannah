@@ -2,10 +2,19 @@
 
 {% if report %}
 <article>
+  <div class="print-only print-head">
+    <h1>{{ app_name }} – Rapportage</h1>
+    <p data-print-filters>Periode {{ report.filter.describe_period() }}</p>
+  </div>
   <header class="page-head">
     <span>Periode {{ report.filter.describe_period() }}</span>
-    {% if principal.can(Permission.EXPORT) and not report.is_empty %}
-    <a href="/api/v1/reports/export.csv?{{ export_query }}" download>Exporteer CSV</a>
+    {% if not report.is_empty %}
+    <span class="export-links">
+      {% if principal.can(Permission.EXPORT) %}
+      <a href="/api/v1/reports/export.csv?{{ export_query }}" download>Exporteer CSV</a>
+      {% endif %}
+      <a href="#" data-print-report title="Kies in het printvenster 'Opslaan als PDF'">Exporteer PDF</a>
+    </span>
     {% endif %}
   </header>
 

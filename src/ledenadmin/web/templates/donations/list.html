@@ -1,9 +1,21 @@
 {% extends "base.html" %}
+{% from "macros.html" import csrf %}
 {% block title %}Donaties – {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <h1>Recente donaties</h1>
   {% if principal.can(Permission.DONATIONS_WRITE) %}<a role="button" href="/donaties/nieuw">Donatie registreren</a>{% endif %}
 </div>
+{% if principal.can(Permission.DONATIONS_DELETE) and donations %}
+<form id="donaties-selectie" method="post" action="/donaties/verwijderen" data-bulk-select>
+  {{ csrf(csrf_token) }}
+  <div class="bulk-bar" hidden>
+    <span data-bulk-count aria-live="polite"></span>
+    <button type="submit" class="danger-button" data-bulk-delete>Verwijderen</button>
+  </div>
+  {% with donations=donations, hide_member=False, selectable=True %}{% include "donations/_table.html" %}{% endwith %}
+</form>
+{% else %}
 {% with donations=donations, hide_member=False %}{% include "donations/_table.html" %}{% endwith %}
+{% endif %}
 {% endblock %}

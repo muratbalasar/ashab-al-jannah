@@ -2,6 +2,15 @@
 {#- Sleutels: "nieuwe-categorie", "cat-<id>", "sub-<id>", "nieuw-<categorie-id>" (nieuwe subcategorie). -#}
 {% set state = {"editing": editing, "form_values": values, "form_errors": errors, "token": csrf_token} %}
 
+{% macro delete_button(state, key, name, action) -%}
+<form method="post" action="{{ action }}/verwijderen" hx-post="{{ action }}/verwijderen"
+      hx-confirm="'{{ name }}' definitief verwijderen?" data-once>
+  {{ csrf(state.token) }}
+  <button id="verwijder-{{ key }}" type="submit" class="link-action danger"
+          aria-label="{{ name }} verwijderen">Verwijderen</button>
+</form>
+{%- endmacro %}
+
 {% macro name_form(state, key, action, current, label, submit_label, autofocus) -%}
 {% set own_errors = state.form_errors if state.editing == key else {} %}
 {% set value = state.form_values.get('name', current) if state.editing == key else current %}
@@ -21,7 +30,7 @@
 <a href="/categorieen#{{ anchor }}" hx-get="/categorieen" class="link-action muted">Annuleren</a>
 {%- endmacro %}
 
-{% macro row(state, key, name, is_active, action, label, anchor, tag) -%}
+{% macro row(state, key, name, is_active, action, label, anchor, tag, deletable) -%}
 <div class="cat-row">
 {% if state.editing == key %}
   {{ name_form(state, key, action, name, label, "Opslaan", True) }}
@@ -37,12 +46,14 @@
       <button id="status-{{ key }}" type="submit" class="link-action{% if is_active %} muted{% endif %}"
               aria-label="{{ name }} {{ 'deactiveren' if is_active else 'activeren' }}">{{ 'Deactiveren' if is_active else 'Activeren' }}</button>
     </form>
+    {% if deletable %}{{ delete_button(state, key, name, action) }}{% endif %}
   </div>
 {% endif %}
 </div>
 {%- endmacro %}
 
 <div id="categorie-beheer" hx-target="#categorie-beheer" hx-swap="outerHTML">
+  {% if beheer_melding %}<p class="notice" role="status">{{ beheer_melding }}</p>{% endif %}
   <div class="new-category">
     {{ name_form(state, "nieuwe-categorie", "/categorieen", "", "Nieuwe categorie", "Toevoegen", editing == "nieuwe-categorie") }}
   </div>
@@ -50,12 +61,13 @@
   {% for c in categories %}
   {% set anchor = "categorie-" ~ c.id %}
   {% set base = "/categorieen/" ~ c.id %}
+  {% set cat_used = c.subcategories | selectattr("id", "in", used_subcategory_ids) | list %}
   <article id="{{ anchor }}" class="cat-card{% if not c.is_active %} is-inactive{% endif %}">
-    {{ row(state, "cat-" ~ c.id, c.name, c.is_active, base, "Naam van de categorie", anchor, "h2") }}
+    {{ row(state, "cat-" ~ c.id, c.name, c.is_active, base, "Naam van de categorie", anchor, "h2", not cat_used) }}
     <ul class="cat-list">
       {% for s in c.subcategories %}
       <li{% if not s.is_active %} class="is-inactive"{% endif %}>
-        {{ row(state, "sub-" ~ s.id, s.name, s.is_active, base ~ "/subcategorieen/" ~ s.id, "Naam van de subcategorie", anchor, "span") }}
+        {{ row(state, "sub-" ~ s.id, s.name, s.is_active, base ~ "/subcategorieen/" ~ s.id, "Naam van de subcategorie", anchor, "span", s.id not in used_subcategory_ids) }}
       </li>
       {% endfor %}
       <li class="add-row">

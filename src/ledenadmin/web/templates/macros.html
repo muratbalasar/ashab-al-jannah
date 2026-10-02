@@ -14,6 +14,27 @@
   <input type="hidden" name="csrf_token" value="{{ token }}">
 {%- endmacro %}
 
+{#- Ledenkeuzelijst met zoekveld. Het zoekveld filtert de opties in de browser (app.js) op
+    naam, lidnummer en e-mail; zonder JavaScript blijft het zoekveld verborgen. -#}
+{% macro member_picker(name, label, members, selected, placeholder, errors={}, required=False) -%}
+<div class="member-picker">
+  <label for="{{ name }}">{{ label }}</label>
+  <div class="member-picker-row">
+    <input type="search" class="member-search" data-member-search="{{ name }}" hidden
+           placeholder="Zoek op naam, nummer of e-mail" autocomplete="off" spellcheck="false"
+           aria-label="{{ label }} zoeken" aria-controls="{{ name }}" aria-describedby="{{ name }}-aantal">
+    <select id="{{ name }}" name="{{ name }}" {% if required %}required{% endif %} {{ invalid(errors, name) }}>
+      <option value="">{{ placeholder }}</option>
+      {% for m in members %}
+      <option value="{{ m.id }}" data-zoek="{{ m.email }}" {% if selected == m.id|string %}selected{% endif %}>{{ m.name }} ({{ m.id }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <small id="{{ name }}-aantal" class="member-count" aria-live="polite"></small>
+  {{ field_error(errors, name) }}
+</div>
+{%- endmacro %}
+
 {#- Datumveld in Nederlandse notatie. De knop opent de kalender van de browser via een
     verborgen hulpveld (app.js); zonder JavaScript kun je de datum gewoon typen. -#}
 {% macro date_field(name, label, value, errors, with_time=False, required=False) -%}

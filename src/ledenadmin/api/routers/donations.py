@@ -33,3 +33,13 @@ def recent_donations(
 @router.get("/{donation_id}", response_model=DonationRead)
 def get_donation(donation_id: int, services: Services, _: CanRead) -> DonationRead:
     return DonationRead.from_entity(services.donations.get(donation_id))
+
+
+@router.delete("/{donation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_donation(
+    donation_id: int,
+    services: Services,
+    _: Annotated[Principal, Depends(require(Permission.DONATIONS_DELETE))],
+) -> None:
+    services.donations.get(donation_id)
+    services.donations.delete_many([donation_id])

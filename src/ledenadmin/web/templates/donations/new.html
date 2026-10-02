@@ -1,20 +1,12 @@
 {% extends "base.html" %}
-{% from "macros.html" import field_error, invalid, form_error, csrf, date_field %}
+{% from "macros.html" import field_error, invalid, form_error, csrf, date_field, member_picker %}
 {% block title %}Donatie registreren – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Donatie registreren</h1>
 <form method="post" action="/donaties" data-once novalidate>
   {{ csrf(csrf_token) }}
   {{ form_error(errors) }}
-  <label for="member_id">Lid
-    <select id="member_id" name="member_id" required {{ invalid(errors, 'member_id') }}>
-      <option value="">Kies een lid…</option>
-      {% for m in members %}
-      <option value="{{ m.id }}" {% if values.get('member_id') == m.id|string %}selected{% endif %}>{{ m.name }} ({{ m.id }})</option>
-      {% endfor %}
-    </select>
-    {{ field_error(errors, 'member_id') }}
-  </label>
+  {{ member_picker("member_id", "Lid", members, values.get('member_id', ''), "Kies een lid…", errors, required=True) }}
   <label for="subcategory_id">Categorie / subcategorie
     <select id="subcategory_id" name="subcategory_id" required {{ invalid(errors, 'subcategory_id') }}>
       <option value="">Kies een categorie…</option>

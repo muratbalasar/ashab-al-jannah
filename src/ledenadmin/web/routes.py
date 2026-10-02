@@ -6,8 +6,11 @@ from urllib.parse import urlencode
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import RedirectResponse
 from pydantic import ValidationError
+from sqlalchemy.orm import Session
 
-from ledenadmin.api.deps import CurrentPrincipal, Services, require
+from ledenadmin import audit
+from ledenadmin.api.deps import CurrentPrincipal, Services, get_session, require
+from ledenadmin.audit import Action
 from ledenadmin.auth.principal import Principal
 from ledenadmin.domain.enums import MemberStatus, Permission
 from ledenadmin.domain.errors import ConflictError, DomainError
@@ -24,8 +27,11 @@ MESSAGES = {
     "lid-aangemaakt": "Het lid is aangemaakt.",
     "lid-bijgewerkt": "Het lid is bijgewerkt.",
     "donatie-geregistreerd": "De donatie is geregistreerd.",
+    "donatie-verwijderd": "De donatie is verwijderd.",
+    "donaties-verwijderd": "{aantal} donaties zijn verwijderd.",
     "categorie-opgeslagen": "De categorie is opgeslagen.",
     "subcategorie-opgeslagen": "De subcategorie is opgeslagen.",
+    "verwijderd": "Verwijderd.",
 }
 
 CATEGORY_NAME_ERROR = "Vul een naam in (maximaal 100 tekens)."
@@ -44,6 +50,8 @@ FIELD_MESSAGES = {
 }
 
 FILTER_FIELDS = ("start_date", "end_date", "member_id", "category_id", "subcategory_id")
+# Ledenkeuzelijsten bevatten alle leden; filteren gebeurt in de browser (app.js).
+MEMBER_PICKER_LIMIT = 10_000
 FormText = Annotated[str, Form()]
 FormBool = Annotated[bool, Form()]
 
@@ -58,10 +66,14 @@ def _perm(permission: Permission):
 def render(
     request: Request, template: str, context: dict[str, Any] | None = None, status_code: int = 200
 ) -> Response:
+    melding = MESSAGES.get(request.query_params.get("melding", ""))
+    aantal = request.query_params.get("aantal", "")
+    if melding and "{aantal}" in melding:
+        melding = melding.format(aantal=int(aantal)) if aantal.isdigit() else None
     base = {
         "principal": getattr(request.state, "principal", None),
         "csrf_token": request.state.csrf_token,
-        "melding": MESSAGES.get(request.query_params.get("melding", "")),
+        "melding": melding,
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code
@@ -138,13 +150,9 @@ def chart_data(report: Report | None) -> dict[str, Any]:
 
 
 @router.get("/")
-def dashboard(request: Request, services: Services, principal: CurrentPrincipal) -> Response:
-    report = None
-    if principal.can(Permission.REPORTS_READ):
-        end = today(request)
-        report_filter = ReportFilter(start_date=end.replace(day=1), end_date=end)
-        report = services.visible_report(principal, report_filter)
-    return render(request, "dashboard.html", {"report": report})
+def home() -> Response:
+    # De rapportage is de startpagina; /rapportage regelt zelf de rechtencontrole.
+    return RedirectResponse("/rapportage", status_code=303)
 
 
 # ── Leden ────────────────────────────────────────────────────────────────────
@@ -159,7 +167,7 @@ def members_list(
     status: str = "",
 ) -> Response:
     status_value = MemberStatus(status) if status in set(MemberStatus) else None
-    members = services.members.search(q.strip() or None, status_value, limit=200)
+    members = services.members.search(q.strip() or None, status_value, limit=None)
     context = {"members": members, "q": q, "status": status}
     template = "members/_table.html" if is_partial(request) else "members/list.html"
     return render(request, template, context)
@@ -235,6 +243,33 @@ def member_update(
     return RedirectResponse(f"/leden/{member_id}?melding=lid-bijgewerkt", status_code=303)
 
 
+# ── Logboek ──────────────────────────────────────────────────────────────────
+
+
+@router.post("/logboek/klik", status_code=204)
+def audit_click(_: CurrentPrincipal) -> Response:
+    # De AuditMiddleware schrijft de regel; hier alleen authenticatie en CSRF.
+    return Response(status_code=204)
+
+
+@router.get("/logboek")
+def audit_index(
+    request: Request,
+    session: Annotated[Session, Depends(get_session)],
+    _: _perm(Permission.AUDIT_READ),
+    gebruiker: str = "",
+    actie: str = "",
+) -> Response:
+    actions = [Action.LOGIN, Action.VIEW, Action.CLICK, Action.UPDATE, Action.DELETE]
+    context = {
+        "entries": audit.recent(session, gebruiker.strip(), actie if actie in actions else ""),
+        "actions": actions,
+        "gebruiker": gebruiker,
+        "actie": actie,
+    }
+    return render(request, "audit/index.html", context)
+
+
 # ── Donaties ─────────────────────────────────────────────────────────────────
 
 
@@ -242,7 +277,7 @@ def member_update(
 def donations_list(
     request: Request, services: Services, _: _perm(Permission.DONATIONS_READ)
 ) -> Response:
-    donations = [DonationRead.from_entity(d) for d in services.donations.recent(100)]
+    donations = [DonationRead.from_entity(d) for d in services.donations.recent(None)]
     return render(request, "donations/list.html", {"donations": donations})
 
 
@@ -250,7 +285,7 @@ def _donation_form(request, services, values, errors, status_code=200) -> Respon
     context = {
         "values": values,
         "errors": errors,
-        "members": services.members.search(status=MemberStatus.ACTIVE, limit=500),
+        "members": services.members.search(status=MemberStatus.ACTIVE, limit=MEMBER_PICKER_LIMIT),
         "categories": services.categories.list(),
     }
     return render(request, "donations/new.html", context, status_code)
@@ -300,6 +335,17 @@ def donation_create(
     return RedirectResponse("/donaties?melding=donatie-geregistreerd", status_code=303)
 
 
+@router.post("/donaties/verwijderen")
+def donations_delete(
+    services: Services,
+    _: _perm(Permission.DONATIONS_DELETE),
+    ids: Annotated[list[int] | None, Form()] = None,
+) -> Response:
+    count = services.donations.delete_many(ids or [])
+    melding = "donatie-verwijderd" if count == 1 else "donaties-verwijderd"
+    return RedirectResponse(f"/donaties?melding={melding}&aantal={count}", status_code=303)
+
+
 # ── Categorieën ──────────────────────────────────────────────────────────────
 # Met HTMX wordt alleen het beheerblok vervangen (scrollpositie blijft behouden);
 # zonder JavaScript werken dezelfde formulieren via redirects.
@@ -314,13 +360,16 @@ def _categories_page(
     values: dict[str, str] | None = None,
     errors: dict[str, str] | None = None,
     status_code: int = 200,
+    melding: str = "",
 ) -> Response:
     """`editing` is de sleutel van het geopende formulier; `values`/`errors` horen daarbij."""
     context = {
         "categories": services.categories.list(include_inactive=True),
+        "used_subcategory_ids": services.categories.used_subcategory_ids(),
         "editing": editing,
         "values": values or {},
         "errors": errors or {},
+        "beheer_melding": melding,
     }
     template = "categories/_beheer.html" if is_partial(request) else "categories/index.html"
     return render(request, template, context, status_code)
@@ -456,6 +505,38 @@ def subcategory_set_status(
     return _saved(request, services, category_id, "subcategorie-opgeslagen")
 
 
+def _delete(request: Request, services: Services, delete: Callable[[], None]) -> Response:
+    try:
+        delete()
+    except ConflictError as exc:
+        return _categories_page(request, services, melding=exc.message, status_code=409)
+    if is_partial(request):
+        return _categories_page(request, services, melding="Verwijderd.")
+    return RedirectResponse("/categorieen?melding=verwijderd", status_code=303)
+
+
+@router.post("/categorieen/{category_id}/verwijderen")
+def category_delete(
+    request: Request, category_id: int, services: Services, _: CanManageCategories
+) -> Response:
+    return _delete(request, services, lambda: services.categories.delete_category(category_id))
+
+
+@router.post("/categorieen/{category_id}/subcategorieen/{subcategory_id}/verwijderen")
+def subcategory_delete(
+    request: Request,
+    category_id: int,
+    subcategory_id: int,
+    services: Services,
+    _: CanManageCategories,
+) -> Response:
+    return _delete(
+        request,
+        services,
+        lambda: services.categories.delete_subcategory(category_id, subcategory_id),
+    )
+
+
 # ── Rapportage ───────────────────────────────────────────────────────────────
 
 
@@ -485,7 +566,9 @@ def reports(
 
     context["categories"] = services.categories.list(include_inactive=True)
     context["members"] = (
-        services.members.search(limit=500) if principal.can(Permission.REPORTS_MEMBER_READ) else []
+        services.members.search(limit=MEMBER_PICKER_LIMIT)
+        if principal.can(Permission.REPORTS_MEMBER_READ)
+        else []
     )
     return render(request, "reports/index.html", context)
 

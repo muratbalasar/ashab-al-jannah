@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Logboek – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Logboek</h1>
+<form method="get" action="/logboek" class="grid" hx-get="/logboek" hx-trigger="input delay:300ms, change" hx-target="#audit-results" hx-select="#audit-results" hx-swap="outerHTML" hx-push-url="true">
+  <label for="gebruiker">Gebruiker
+    <input id="gebruiker" name="gebruiker" type="search" value="{{ gebruiker }}" placeholder="Naam bevat…">
+  </label>
+  <label for="actie">Actie
+    <select id="actie" name="actie">
+      <option value="">Alle acties</option>
+      {% for a in actions %}<option value="{{ a }}" {% if a == actie %}selected{% endif %}>{{ a | capitalize }}</option>{% endfor %}
+    </select>
+  </label>
+</form>
+
+<div id="audit-results">
+<p><small>De laatste {{ entries | length }} acties, nieuwste eerst.</small></p>
+{% if entries %}
+<div class="overflow-auto">
+  <table class="striped audit-table">
+    <thead>
+      <tr>
+        <th scope="col">Tijdstip</th>
+        <th scope="col">Gebruiker</th>
+        <th scope="col">Actie</th>
+        <th scope="col">Pagina / verzoek</th>
+        <th scope="col" class="num">Status</th>
+        <th scope="col">Details</th>
+      </tr>
+    </thead>
+    <tbody data-paginate>
+      {% for e in entries %}
+      <tr>
+        <td class="nowrap">{{ e.at | localdt }}</td>
+        <td>{{ e.user }}</td>
+        <td><span class="audit-action audit-{{ e.action }}">{{ e.action }}</span></td>
+        <td><code>{{ e.method }} {{ e.path }}</code></td>
+        <td class="num">{{ e.status_code or "" }}</td>
+        <td class="audit-detail">{{ e.detail or "" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="empty">Geen acties gevonden.</p>
+{% endif %}
+</div>
+{% endblock %}

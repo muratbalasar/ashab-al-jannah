@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import field_error, invalid, date_field %}
+{% from "macros.html" import field_error, invalid, date_field, member_picker %}
 {% block title %}Rapportage – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Rapportage</h1>
@@ -10,17 +10,10 @@
     {{ date_field("start_date", "Van", values.get('start_date', ''), errors) }}
     {{ date_field("end_date", "Tot en met", values.get('end_date', ''), errors) }}
   </div>
+  {% if principal.can(Permission.REPORTS_MEMBER_READ) %}
+  {{ member_picker("member_id", "Lid", members, values.get('member_id', ''), "Alle leden") }}
+  {% endif %}
   <div class="grid">
-    {% if principal.can(Permission.REPORTS_MEMBER_READ) %}
-    <label for="member_id">Lid
-      <select id="member_id" name="member_id">
-        <option value="">Alle leden</option>
-        {% for m in members %}
-        <option value="{{ m.id }}" {% if values.get('member_id') == m.id|string %}selected{% endif %}>{{ m.name }} ({{ m.id }})</option>
-        {% endfor %}
-      </select>
-    </label>
-    {% endif %}
     <label for="category_id">Categorie
       <select id="category_id" name="category_id">
         <option value="">Alle categorieën</option>
