@@ -38,11 +38,11 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   kwaliteit:
     name: "Kwaliteit & unit tests"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -66,7 +66,7 @@ jobs:
 
       - name: Coverage-rapport uploaden
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ github.sha }}
           path: coverage.xml
@@ -77,10 +77,10 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   security-scan:
     name: "Dependency security scan (pip-audit)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - run: pip install pip-audit
@@ -94,14 +94,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   functionele-tests:
     name: "Functionele tests (Robot Framework)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: kwaliteit
     env:
       AUTH_MODE: dev
       DATABASE_URL: sqlite:///./output/robot.db
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -147,7 +147,7 @@ jobs:
 
       - name: Resultaten uploaden
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: robot-resultaten-${{ github.sha }}
           path: output/robot-results/
@@ -158,14 +158,14 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   docker-build:
     name: "Docker image bouwen & rooktest"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [kwaliteit, security-scan]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
 
       - name: Image bouwen
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -211,12 +211,12 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   sast:
     name: "SAST & secret scan (Bandit, Gitleaks)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # volledige historie voor de secret scan
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -226,18 +226,18 @@ jobs:
           bandit -r src -ll
 
       - name: Gitleaks (geheimen in code en git-historie)
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   codeql:
     name: "CodeQL (Python en JavaScript)"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v4
         with:
           languages: python, javascript
@@ -249,7 +249,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   docker-push:
     name: "Image publiceren naar ghcr.io"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [docker-build, functionele-tests, sast, codeql]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     permissions:
@@ -258,21 +258,21 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.image }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
 
       - name: Image-naam bepalen
         id: image
         run: echo "image=ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/${{ env.IMAGE_NAME }}" >> "$GITHUB_OUTPUT"
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Bouwen en pushen
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true
@@ -294,7 +294,7 @@ jobs:
   # ────────────────────────────────────────────────────────────────
   deploy-azure:
     name: "Deploy naar Azure Container Apps"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: docker-push
     if: github.event_name == 'workflow_dispatch' && inputs.deploy_azure
     environment: production
@@ -302,10 +302,10 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Inloggen bij Azure (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -379,7 +379,7 @@ jobs:
 
       - name: Rooktestresultaten uploaden
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: robot-resultaten-azure-${{ github.sha }}
           path: output/robot-results-azure/
