@@ -272,6 +272,44 @@ Gevolgen:
 - SQLite kan maar door één proces tegelijk beschreven worden. Dat is voldoende voor tientallen
   stichtingen met weinig gelijktijdige schrijfacties; de schaalgrens wordt bewaakt.
   Overstappen naar PostgreSQL blijft mogelijk via SQLAlchemy.
+
+### 11.1 SQLite met meerdere gebruikers tegelijk
+
+**Wat wel en niet tegelijk kan**
+- **Lezen** (lijsten, rapportages, `/mijn`) kan door veel gebruikers tegelijk.
+- **Schrijven** gaat één voor één. Een opslag duurt een paar milliseconden, dus wie tegelijk
+  opslaat wacht kort en merkt dat in de praktijk niet. Grove schatting: honderden schrijfacties
+  per seconde zijn haalbaar; de verwachte belasting is een paar per minuut.
+
+**Voorwaarden** (verplicht, ze komen in fase 1)
+1. **Precies één container** (`minReplicas` 0 of 1, `maxReplicas=1`). Twee containers die
+   hetzelfde bestand beschrijven geven corrupte data, en Litestream ondersteunt maar één schrijver.
+2. **Het databasebestand op de lokale schijf van de container**, niet op een Azure Files-share:
+   die netwerkschijf verdraagt de bestandsvergrendeling van SQLite slecht. Bij het opstarten zet
+   Litestream de database terug uit Blob Storage; daarna repliceert het continu.
+3. **Verbindingsinstellingen** in `db.py`:
+   - `PRAGMA journal_mode=WAL`: lezers en de schrijver blokkeren elkaar niet. Litestream heeft
+     dit ook nodig.
+   - `PRAGMA busy_timeout=5000`: wie tegelijk opslaat wacht maximaal 5 seconden in plaats van
+     direct een foutmelding te krijgen.
+   - `PRAGMA foreign_keys=ON`: de database bewaakt de verwijzingen tussen tabellen zelf.
+4. **Uvicorn met één worker**, met één Litestream-proces naast de app in dezelfde container.
+
+**Wat het kost**
+- Met `minReplicas=0` duurt de eerste aanvraag na een stille periode een paar seconden: de
+  container start en de database wordt teruggezet.
+- Crasht de container hard, dan kunnen de laatste wijzigingen verloren gaan (maximaal ongeveer
+  1 seconde, de replicatie-interval van Litestream).
+- Geen hoge beschikbaarheid: tijdens een herstart of uitrol is de app enkele seconden niet bereikbaar.
+
+**Wanneer overstappen naar PostgreSQL**
+- Bij honderden actieve stichtingen met veel gelijktijdig schrijfwerk, of als meerdere containers
+  of hoge beschikbaarheid nodig zijn.
+- De overstap is grotendeels een nieuwe `DATABASE_URL` plus het overzetten van de gegevens,
+  omdat de app SQLAlchemy en Alembic gebruikt.
+- Signalen om te bewaken: wachttijden bij opslaan (`database is locked` in de logs) en
+  responstijden.
+
 ## 12. Fasering
 
 | Fase | Inhoud | Resultaat |
