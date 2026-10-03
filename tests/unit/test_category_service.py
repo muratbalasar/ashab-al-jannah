@@ -6,7 +6,7 @@ from ledenadmin.services.category_service import DEFAULT_CATEGORIES, CategorySer
 
 
 def test_production_defaults_fit_islamic_foundation() -> None:
-    for name in ("Zakat", "Sadaka", "Ramadan", "Kurban", "Contributie"):
+    for name in ("Zakat", "Sadaka", "Ramadan", "Kurban", "Hadj en Umrah", "Sponsoring"):
         assert name in DEFAULT_CATEGORIES
     assert "Iftar" in DEFAULT_CATEGORIES["Ramadan"]
     assert all(subs and len(set(subs)) == len(subs) for subs in DEFAULT_CATEGORIES.values())

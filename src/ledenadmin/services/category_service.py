@@ -15,6 +15,8 @@ DEFAULT_CATEGORIES: dict[str, list[str]] = {
     "Noodhulp": ["Algemeen", "Natuurramp"],
     "Onderwijs": ["Koranonderwijs", "Studiebeurs"],
     "Moskee": ["Onderhoud", "Nieuwbouw"],
+    "Hadj en Umrah": ["Hadj", "Umrah"],
+    "Sponsoring": ["Bedrijven", "Particulier"],
     "Contributie": ["Jaarlijks", "Maandelijks"],
 }
 
