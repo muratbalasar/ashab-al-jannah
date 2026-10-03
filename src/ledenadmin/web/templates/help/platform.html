@@ -3,4 +3,5 @@
   <li>U ziet als superadmin <strong>geen ledengegevens</strong>, tenzij u zelf lid bent van een organisatie.</li>
   <li>Configuratie en de productie-checklist per fase: zie <code>README.md</code> (Configuratie) en <code>4-EntraExternalID.md</code>.</li>
   <li>Bewaar <code>SECRET_ENCRYPTION_KEY</code> veilig: zonder die sleutel moeten alle stichtingen Mollie opnieuw koppelen.</li>
+  <li><strong>Fouten onderzoeken</strong>: bij een onverwachte fout ziet de gebruiker een foutcode (bijv. <code>ERR-7F3K2Q</code>). In het <em>Logboek</em> (actie <em>fout</em> of <em>browserfout</em>) staan pagina, gebruiker en fouttype; de volledige traceback zoekt u op dezelfde code in het serverlog (lokaal het consolevenster, in Azure de App Service-logstream). Het aantal fouten van de laatste 24 uur staat op <a href="/platform">Platform</a>.</li>
 </ul>

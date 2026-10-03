@@ -16,7 +16,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.responses import Response
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 
 from ledenadmin.domain.models import AuditLog
 from ledenadmin.tenancy import current_organization_id
@@ -25,6 +25,7 @@ logger = logging.getLogger("ledenadmin.audit")
 
 SESSION_COOKIE = "logboek_sessie"
 CLICK_SUFFIX = "/logboek/klik"
+CLIENT_ERROR_SUFFIX = "/logboek/fout"
 SKIP_PREFIXES = ("/static/", "/api/v1/health", "/favicon")
 SKIP_FIELDS = {"csrf_token"}
 MAX_DETAIL = 2000
@@ -36,11 +37,15 @@ class Action:
     CLICK = "klik"
     UPDATE = "wijziging"
     DELETE = "verwijdering"
+    ERROR = "fout"
+    CLIENT_ERROR = "browserfout"
 
 
 def classify(method: str, path: str) -> str:
     if path.endswith(CLICK_SUFFIX):
         return Action.CLICK
+    if path.endswith(CLIENT_ERROR_SUFFIX):
+        return Action.CLIENT_ERROR
     if method == "DELETE" or path.endswith("/verwijderen"):
         return Action.DELETE
     if method in {"POST", "PUT", "PATCH"}:
@@ -73,6 +78,25 @@ def _detail_from_body(content_type: str, body: bytes) -> dict[str, object]:
     return {}
 
 
+ERROR_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
+def new_error_code() -> str:
+    return "ERR-" + "".join(secrets.choice(ERROR_ALPHABET) for _ in range(6))
+
+
+def error_response(request: Request, code: str) -> Response:
+    from ledenadmin.api.errors import is_api_request, render_error
+
+    message = "Er ging onverwacht iets mis. Vermeld code " + code + " als u contact opneemt."
+    if is_api_request(request):
+        return JSONResponse({"detail": message, "code": code}, status_code=500)
+    try:
+        return render_error(request, 500, message, code)
+    except Exception:  # pragma: no cover - laatste vangnet
+        return PlainTextResponse(message, status_code=500)
+
+
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         path = request.url.path
@@ -88,7 +112,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
             body = await request.body()
             detail |= _detail_from_body(request.headers.get("content-type", ""), body)
 
-        response = await call_next(request)
+        error: dict[str, str] | None = None
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            # Onverwachte fout: traceback met foutcode naar het serverlog, korte regel in
+            # het logboek en een nette foutpagina met dezelfde code voor de gebruiker.
+            code = new_error_code()
+            logger.exception("%s %s %s", code, method, path)
+            error = {"foutcode": code, "type": type(exc).__name__}
+            response = error_response(request, code)
 
         principal = getattr(request.state, "principal", None)
         identity = getattr(request.state, "identity", None) or principal
@@ -113,8 +146,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 secure=request.app.state.settings.is_production,
             )
 
-        action = classify(method, path)
-        if action == Action.CLICK:
+        action = Action.ERROR if error else classify(method, path)
+        if error:
+            text = json.dumps(error | detail, ensure_ascii=False)
+        elif action in (Action.CLICK, Action.CLIENT_ERROR):
             text = json.dumps({k: v for k, v in detail.items() if k != "query"}, ensure_ascii=False)
         else:
             text = json.dumps(detail, ensure_ascii=False) if detail else None

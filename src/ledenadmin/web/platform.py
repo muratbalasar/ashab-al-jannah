@@ -1,15 +1,17 @@
 """Routes buiten een organisatie: startpagina (organisatiekeuze) en platformbeheer."""
 
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ledenadmin.api.deps import CurrentIdentity, Superadmin
+from ledenadmin.audit import Action
 from ledenadmin.domain.enums import OrganizationStatus
 from ledenadmin.domain.errors import NotFoundError
-from ledenadmin.domain.models import Organization
+from ledenadmin.domain.models import AuditLog, Organization
 from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import DEFAULT_SLUG
 from ledenadmin.services.user_service import UserService
@@ -59,7 +61,18 @@ def platform(request: Request, principal: Superadmin) -> Response:
         service = OrganizationDataService(session)
         service.purge_expired()
         organizations = service.overview()
-    context = {"organizations": organizations, "Status": OrganizationStatus}
+        since = datetime.now(UTC) - timedelta(hours=24)
+        errors = as_platform(session).scalar(
+            select(func.count(AuditLog.id)).where(
+                AuditLog.action.in_((Action.ERROR, Action.CLIENT_ERROR)),
+                AuditLog.at >= since,
+            )
+        )
+    context = {
+        "organizations": organizations,
+        "Status": OrganizationStatus,
+        "errors_24h": errors or 0,
+    }
     return _render(request, "platform/index.html", context)
 
 

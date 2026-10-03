@@ -451,6 +451,12 @@ def member_field_delete(
 # ── Logboek ──────────────────────────────────────────────────────────────────
 
 
+@router.post("/logboek/fout", status_code=204)
+def audit_client_error(_: CurrentPrincipal) -> Response:
+    # JavaScript-fouten uit de browser; de AuditMiddleware schrijft de regel.
+    return Response(status_code=204)
+
+
 @router.post("/logboek/klik", status_code=204)
 def audit_click(_: CurrentPrincipal) -> Response:
     # De AuditMiddleware schrijft de regel; hier alleen authenticatie en CSRF.
@@ -465,7 +471,15 @@ def audit_index(
     gebruiker: str = "",
     actie: str = "",
 ) -> Response:
-    actions = [Action.LOGIN, Action.VIEW, Action.CLICK, Action.UPDATE, Action.DELETE]
+    actions = [
+        Action.LOGIN,
+        Action.VIEW,
+        Action.CLICK,
+        Action.UPDATE,
+        Action.DELETE,
+        Action.ERROR,
+        Action.CLIENT_ERROR,
+    ]
     context = {
         "entries": audit.recent(session, gebruiker.strip(), actie if actie in actions else ""),
         "actions": actions,

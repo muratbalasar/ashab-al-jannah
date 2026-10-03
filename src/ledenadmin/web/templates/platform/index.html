@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Platformbeheer</h1>
 {% set active = organizations | selectattr("status", "equalto", Status.ACTIVE.value) | list %}
-<p class="info-bar">Organisaties: <strong>{{ organizations | length }}</strong> · actief: <strong>{{ active | length }}</strong> · gebruikers: <strong>{{ organizations | sum(attribute="users") }}</strong> · leden: <strong>{{ organizations | sum(attribute="members") }}</strong></p>
+<p class="info-bar">Organisaties: <strong>{{ organizations | length }}</strong> · actief: <strong>{{ active | length }}</strong> · gebruikers: <strong>{{ organizations | sum(attribute="users") }}</strong> · leden: <strong>{{ organizations | sum(attribute="members") }}</strong> · fouten (24 uur): <strong{% if errors_24h %} class="error"{% endif %}>{{ errors_24h }}</strong></p>
 <div class="overflow-auto">
   <table class="striped">
     <thead>

@@ -58,6 +58,12 @@ def register_error_handlers(app: FastAPI) -> None:
 
 
 def _html_error(request: Request, status_code: int, message: str) -> Response:
+    return render_error(request, status_code, message)
+
+
+def render_error(
+    request: Request, status_code: int, message: str, code: str | None = None
+) -> Response:
     templates = request.app.state.templates
     return templates.TemplateResponse(
         request,
@@ -65,6 +71,7 @@ def _html_error(request: Request, status_code: int, message: str) -> Response:
         {
             "status_code": status_code,
             "message": message,
+            "error_code": code,
             "principal": None,
             "org": "",
             "csrf_token": getattr(request.state, "csrf_token", ""),

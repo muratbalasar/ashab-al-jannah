@@ -157,6 +157,26 @@
     true
   );
 
+  // JavaScript-fouten naar het logboek (maximaal 5 per pagina), voor onderzoek achteraf.
+  let reportedErrors = 0;
+  const reportError = (message, source) => {
+    const org = document.body.dataset.org;
+    if (!org || reportedErrors >= 5) return;
+    reportedErrors += 1;
+    const data = new URLSearchParams();
+    data.append("csrf_token", csrfToken());
+    data.append("melding", String(message || "").slice(0, 500));
+    data.append("bron", String(source || "").slice(0, 300));
+    data.append("pagina", location.pathname + location.search);
+    navigator.sendBeacon(org + "/logboek/fout", data);
+  };
+  window.addEventListener("error", (e) =>
+    reportError(e.message, `${e.filename || ""}:${e.lineno || ""}:${e.colno || ""}`)
+  );
+  window.addEventListener("unhandledrejection", (e) =>
+    reportError(e.reason && (e.reason.stack || e.reason.message || e.reason), "promise")
+  );
+
   // Voorkomt dubbel versturen van formulieren met data-once.
   document.addEventListener("submit", function (event) {
     const form = event.target;
