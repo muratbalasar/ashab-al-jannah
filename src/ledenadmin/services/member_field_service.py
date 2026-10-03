@@ -5,6 +5,7 @@ Gevoelige persoonsgegevens (zoals BSN) worden geblokkeerd: zowel als veldnaam al
 
 import re
 import unicodedata
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import delete, select
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ledenadmin.domain.errors import ConflictError, NotFoundError
 from ledenadmin.domain.models import MemberField, MemberFieldValue
+from ledenadmin.web.dates import nl_date_to_iso, nl_datetime_to_iso
 
 
 class FieldType(StrEnum):
@@ -21,6 +23,7 @@ class FieldType(StrEnum):
     MOBILE = "mobiel"
     IBAN = "iban"
     BOOLEAN = "ja_nee"
+    DATETIME = "datumtijd"
 
 
 FIELD_TYPE_LABELS = {
@@ -29,6 +32,7 @@ FIELD_TYPE_LABELS = {
     FieldType.MOBILE: "Mobiel nummer",
     FieldType.IBAN: "IBAN",
     FieldType.BOOLEAN: "Ja/nee",
+    FieldType.DATETIME: "Datum en tijd",
 }
 
 LABEL_MAX = 100
@@ -135,6 +139,18 @@ def _number(value: str) -> str:
     return number
 
 
+def _datetime(value: str) -> str:
+    """Accepteert NL- of ISO-notatie; slaat op als 'dd-mm-jjjj uu:mm'."""
+    iso = nl_datetime_to_iso(value)
+    date_only = nl_date_to_iso(value)
+    if date_only != value or re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        iso = f"{date_only}T00:00"
+    try:
+        return datetime.strptime(iso, "%Y-%m-%dT%H:%M").strftime("%d-%m-%Y %H:%M")
+    except ValueError:
+        raise ValueError("Vul een geldige datum en tijd in, bijv. 14-02-2026 10:30.") from None
+
+
 def normalize(field_type: str, value: str) -> str:
     """Controleert en normaliseert een waarde; geeft '' terug voor leeg. ValueError bij fouten."""
     value = value.strip()
@@ -152,6 +168,8 @@ def normalize(field_type: str, value: str) -> str:
         return _mobile(value)
     if field_type == FieldType.NUMBER:
         return _number(value)
+    if field_type == FieldType.DATETIME:
+        return _datetime(value)
     return value
 
 

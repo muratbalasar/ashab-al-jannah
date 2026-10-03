@@ -42,7 +42,13 @@ def test_normalize_per_type() -> None:
     assert normalize(FieldType.BOOLEAN, "ja") == "ja"
     assert normalize(FieldType.BOOLEAN, "") == ""
     assert normalize(FieldType.TEXT, "  ") == ""
+    assert normalize(FieldType.DATETIME, "7-3-2026 9:05") == "07-03-2026 09:05"
+    assert normalize(FieldType.DATETIME, "2026-03-07T09:05") == "07-03-2026 09:05"
+    assert normalize(FieldType.DATETIME, "26-08-1972") == "26-08-1972 00:00"
+    assert normalize(FieldType.DATETIME, "1972-08-26") == "26-08-1972 00:00"
     for field_type, value in [
+        (FieldType.DATETIME, "31-02-2026 10:00"),
+        (FieldType.DATETIME, "morgen"),
         (FieldType.IBAN, "NL91ABNA0417164301"),
         (FieldType.MOBILE, "0201234567"),
         (FieldType.NUMBER, "abc"),

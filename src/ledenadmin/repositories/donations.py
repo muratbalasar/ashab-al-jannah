@@ -38,8 +38,11 @@ class DonationRepository:
             stmt = stmt.limit(limit)
         return list(self._session.scalars(stmt).unique())
 
-    def count(self) -> int:
-        return self._session.scalar(select(func.count(Donation.id))) or 0
+    def count(self, member_id: int | None = None) -> int:
+        stmt = select(func.count(Donation.id))
+        if member_id is not None:
+            stmt = stmt.where(Donation.member_id == member_id)
+        return self._session.scalar(stmt) or 0
 
     def delete_many(self, donation_ids: list[int]) -> int:
         if not donation_ids:

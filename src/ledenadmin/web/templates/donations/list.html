@@ -6,9 +6,10 @@
   <h1>Recente donaties</h1>
   {% if principal.can(Permission.DONATIONS_WRITE) %}<a role="button" href="/donaties/nieuw">Donatie registreren</a>{% endif %}
 </div>
+<p id="donaties-info" class="info-bar" aria-live="polite">{% if member_id %}Gevonden donaties{% else %}Totaal aantal donaties{% endif %}: <strong>{{ donations | length }}</strong></p>
 <search aria-label="Donaties filteren">
 <form class="donation-filter" action="/donaties" method="get"
-      hx-get="/donaties" hx-target="#donaties-lijst" hx-select="#donaties-lijst" hx-swap="outerHTML"
+      hx-get="/donaties" hx-target="#donaties-lijst" hx-select="#donaties-lijst" hx-swap="outerHTML" hx-select-oob="#donaties-info"
       hx-push-url="true" hx-trigger="change from:#member_id">
   {{ member_picker("member_id", "Lid", members, member_id, "Alle leden") }}
   <noscript><button type="submit">Filteren</button></noscript>

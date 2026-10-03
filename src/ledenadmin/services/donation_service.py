@@ -39,6 +39,9 @@ class DonationService:
     def recent(self, limit: int | None = 50, member_id: int | None = None) -> list[Donation]:
         return self._donations.find(DonationQuery(member_id=member_id), limit=limit)
 
+    def count(self, member_id: int | None = None) -> int:
+        return self._donations.count(member_id)
+
     def register(self, data: DonationCreate, actor: str) -> Donation:
         member = self._members.get(data.member_id)
         if member is None:

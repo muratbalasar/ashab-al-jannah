@@ -22,15 +22,45 @@ consistent blijven. De Python-package heet intern `ledenadmin`.
 
 ## Snel starten (lokaal)
 
-Vereist: Python 3.12 of hoger.
+Er zijn twee manieren: direct met Python via `start.ps1` (handig om te ontwikkelen) of
+met de container-image via Docker (zonder Python op je machine).
 
-```powershell
-cd ashab-al-jannah
-.\start.ps1 -Install        # venv + dependencies, migraties, server op http://127.0.0.1:8000
-```
+### Optie A – Met Python en `start.ps1`
 
-- Web-UI: <http://127.0.0.1:8000>
-- API-documentatie (OpenAPI): <http://127.0.0.1:8000/api/docs>
+1. **Installeer de benodigdheden**
+   - [Git](https://git-scm.com/downloads), bijv. `winget install Git.Git`.
+   - [Python 3.12 of hoger](https://www.python.org/downloads/), bijv.
+     `winget install Python.Python.3.12`. Vink bij de installer *Add python.exe to PATH* aan.
+   - Op Linux/macOS: `git` en `python3` (met `venv`) via de pakketbeheerder. `start.ps1` is
+     Windows-only; gebruik daar de commando's onder stap 3.
+2. **Clone de repository**
+
+   ```powershell
+   git clone https://github.com/muratbalasar/ashab-al-jannah.git
+   cd ashab-al-jannah
+   ```
+
+3. **Start de app** (de eerste keer duurt het installeren even):
+
+   ```powershell
+   .\start.ps1 -Install -InitWithDummyData   # venv + dependencies, migraties, demodata, server
+   ```
+
+   Weigert Windows het script, sta dan lokale scripts toe voor deze sessie:
+   `Set-ExecutionPolicy -Scope Process RemoteSigned`.
+
+   Linux/macOS (zelfde stappen als `start.ps1`):
+
+   ```sh
+   python3 -m venv .venv && . .venv/bin/activate
+   pip install -r requirements-dev.txt && pip install -e . --no-deps
+   export AUTH_MODE=dev DATABASE_URL=sqlite:///./ledenadmin.db
+   alembic upgrade head
+   python -m ledenadmin.dummy_data            # optioneel: demodata
+   uvicorn --factory ledenadmin.main:create_app --reload --port 8000
+   ```
+4. **Open** <http://127.0.0.1:8000> (API-documentatie: <http://127.0.0.1:8000/api/docs>).
+   Stoppen doe je met `Ctrl+C`. Daarna is `.\start.ps1` genoeg om opnieuw te starten.
 
 `start.ps1` zet `AUTH_MODE=dev`: iedereen is dan automatisch aangemeld met alle rollen.
 Met `.\start.ps1 -InitWithDummyData` worden 120 dummy leden (e-mail `*.dummy@voorbeeld.nl`)
@@ -40,6 +70,103 @@ De lokale database (`ledenadmin.db`) blijft bewaard bij stoppen en herstarten. M
 `.\start.ps1 -ResetDatabase` begin je met een lege database (alleen voor SQLite). Combineer
 met `-InitWithDummyData` voor een schone demo-omgeving.
 Gebruik dit alleen lokaal; met `APP_ENV=production` weigert de applicatie te starten.
+
+### Optie B – Container-image met Docker (Windows en Linux)
+
+Installeer eerst Docker: op Windows [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+(met WSL 2), op Linux [Docker Engine](https://docs.docker.com/engine/install/).
+
+#### B1 – Kant-en-klare image van GitHub (zonder clonen)
+
+Elke push op `main` waarvan de tests slagen, publiceert de image als
+[package op GitHub](https://github.com/muratbalasar/ashab-al-jannah/pkgs/container/ashab-al-jannah)
+(`ghcr.io/muratbalasar/ashab-al-jannah:latest`). Docker haalt hem bij de eerste start
+automatisch op; bijwerken naar de nieuwste versie doe je met
+`docker pull ghcr.io/muratbalasar/ashab-al-jannah:latest`.
+
+Linux (bash):
+
+```sh
+docker run --rm -p 8000:8000 \
+  -e APP_ENV=development -e AUTH_MODE=dev \
+  -e DATABASE_URL=sqlite:////home/app/ledenadmin.db \
+  -v ashab-data:/home/app \
+  --name ashab ghcr.io/muratbalasar/ashab-al-jannah:latest
+```
+
+Windows (PowerShell):
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -e APP_ENV=development -e AUTH_MODE=dev `
+  -e DATABASE_URL=sqlite:////home/app/ledenadmin.db `
+  -v ashab-data:/home/app `
+  --name ashab ghcr.io/muratbalasar/ashab-al-jannah:latest
+```
+
+Open daarna <http://127.0.0.1:8000>. De instellingen worden hieronder bij B2, stap 3, uitgelegd.
+
+#### B2 – Zelf bouwen vanuit de broncode
+
+1. Clone de repository zoals bij optie A, stap 2.
+2. **Bouw de image** (in de map `ashab-al-jannah`). De ODBC-driver voor Azure SQL is lokaal
+   niet nodig en kan worden overgeslagen:
+
+   ```sh
+   docker build -t ashab-al-jannah --build-arg INSTALL_MSSQL_DRIVER=false .
+   ```
+
+3. **Start de container**. De image staat standaard op productie (echte aanmelding, geen
+   SQLite). Voor lokaal gebruik zet je ontwikkelmodus aan en bewaar je de SQLite-database
+   in een Docker-volume, zodat de gegevens een herstart overleven.
+
+   Linux (bash):
+
+   ```sh
+   docker run --rm -p 8000:8000 \
+     -e APP_ENV=development -e AUTH_MODE=dev \
+     -e DATABASE_URL=sqlite:////home/app/ledenadmin.db \
+     -v ashab-data:/home/app \
+     --name ashab ashab-al-jannah
+   ```
+
+   Windows (PowerShell):
+
+   ```powershell
+   docker run --rm -p 8000:8000 `
+     -e APP_ENV=development -e AUTH_MODE=dev `
+     -e DATABASE_URL=sqlite:////home/app/ledenadmin.db `
+     -v ashab-data:/home/app `
+     --name ashab ashab-al-jannah
+   ```
+
+4. **Open** <http://127.0.0.1:8000>. Wil je demodata, voer dan in een tweede terminal uit:
+   `docker exec ashab python -m ledenadmin.dummy_data`.
+   Stoppen doe je met `Ctrl+C` of `docker stop ashab`. Een lege database krijg je met
+   `docker volume rm ashab-data`.
+
+#### Waar staan de gegevens?
+
+De SQLite-database (`/home/app/ledenadmin.db`) staat niet in de container zelf, maar in het
+Docker-volume `ashab-data` (`-v ashab-data:/home/app`). Docker beheert dat volume buiten de
+container.
+
+- **Stoppen en opnieuw starten:** `--rm` verwijdert de container bij het stoppen, maar het
+  volume blijft bestaan. Start je opnieuw met hetzelfde commando, dan zijn alle leden en
+  donaties er nog.
+- **Nieuwe image (`docker pull`):** de gegevens blijven behouden. Bij het opstarten werkt
+  de app het databaseschema automatisch bij (`RUN_MIGRATIONS=true`).
+- **Gegevens kwijt:** als je `-v ashab-data:/home/app` weglaat (de database staat dan in de
+  container en verdwijnt bij het stoppen), of na `docker volume rm ashab-data`.
+- **Back-up maken** (Linux; gebruik in PowerShell `${PWD}`):
+
+  ```sh
+  docker run --rm -v ashab-data:/data -v "$PWD":/backup alpine cp /data/ledenadmin.db /backup/
+  ```
+
+Gebruik `AUTH_MODE=dev` nooit op een publiek bereikbare server: iedereen heeft dan alle
+rechten. Zie [Configuratie](#configuratie) en [Deployment naar Azure](#deployment-naar-azure)
+voor productie.
 
 ## Techstack
 
@@ -146,7 +273,10 @@ tijdstip, de gebruiker, het verzoek, de status, het IP-adres en de details opges
 De details zijn de formulierdata of de zoekparameters, zonder CSRF-token. De beheerder
 bekijkt het logboek op `/logboek` en kan filteren op gebruiker en actie.
 Let op (AVG): de details kunnen persoonsgegevens bevatten, zoals namen en e-mailadressen.
-Regels ouder dan 41 dagen worden automatisch verwijderd (hooguit één keer per uur gecontroleerd).
+Regels ouder dan 41 dagen (`RETENTION` in `audit.py`) worden automatisch verwijderd. Er is
+geen aparte scheduler: na het opslaan van een nieuwe logregel ruimt de app op, hooguit één
+keer per uur per instantie. Zonder verkeer wordt er dus niet opgeruimd, en na een herstart
+gebeurt dat bij de eerstvolgende logregel.
 
 ## Functionele requirements
 
@@ -252,9 +382,17 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 
 De workflow [ci-cd.yml](./.github/workflows/ci-cd.yml) voert bij
 elke push of PR uit: kwaliteit en unit tests, pip-audit, Robot-tests,
-een Docker-build met containerrooktest (inclusief de ODBC-driver). Op `main` wordt het
-image daarna naar ghcr.io gepusht. Deployen gebeurt handmatig via *Run workflow*
-met `deploy_azure`.
+een Docker-build met containerrooktest (inclusief de ODBC-driver) en security-tests:
+
+| Soort | Tool | Wat |
+|---|---|---|
+| SCA | pip-audit, Trivy | Kwetsbare Python-packages; kwetsbaarheden in de container-image (HIGH/CRITICAL) |
+| SAST | Bandit, CodeQL | Onveilige code in Python en JavaScript (resultaten onder *Security → Code scanning*) |
+| Secrets | Gitleaks | Geheimen in code en git-historie |
+| DAST | OWASP ZAP baseline | Passieve scan van de draaiende container; rapport als artifact (nog niet blokkerend) |
+
+Op `main` wordt het image pas naar ghcr.io gepusht als alle tests en scans slagen.
+Deployen gebeurt handmatig via *Run workflow* met `deploy_azure`.
 
 Voor de eerste deployment zijn deze eenmalige stappen nodig:
 
