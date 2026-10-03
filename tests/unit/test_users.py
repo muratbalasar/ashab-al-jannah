@@ -166,3 +166,10 @@ def test_superadmin_without_membership_sees_no_member_data(superadmin_client, or
     admin = {"X-Dev-User": "baas", "X-Dev-Roles": ""}
 
     assert superadmin_client.get("/o/stichting-b/leden", headers=admin).status_code == 404
+
+
+@pytest.mark.parametrize(
+    "path", ["/static/app.css", "/static/vendor/pico.min.css", "/static/app.js"]
+)
+def test_static_files_are_not_caught_by_legacy_redirect(client, path) -> None:
+    assert client.get(path, follow_redirects=False).status_code == 200

@@ -71,6 +71,8 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.add_middleware(SecurityMiddleware, secure_cookies=settings.is_production)
     register_error_handlers(app)
 
+    # Eerst mounten: anders vangt de legacy-route /{section}/... ook /static/... af.
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     # Gegevens per organisatie: web en API onder /o/{org}/...; health blijft globaal.
     app.include_router(system.public_router, prefix="/api/v1")
     org = APIRouter(prefix="/o/{org}")
@@ -85,5 +87,4 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.include_router(web_users.public_router)
     app.include_router(web_payments.webhook_router)
     app.include_router(web_platform.router)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app
