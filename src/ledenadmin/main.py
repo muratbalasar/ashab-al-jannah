@@ -14,9 +14,12 @@ from ledenadmin.config import Settings, get_settings
 from ledenadmin.db import Database
 from ledenadmin.services.ai.insight_service import InsightService, build_insight_provider
 from ledenadmin.services.category_service import CategoryService
+from ledenadmin.services.kvk_service import build_kvk_lookup
+from ledenadmin.services.mail_service import build_mail_transport
 from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.web import platform as web_platform
 from ledenadmin.web import routes as web_routes
+from ledenadmin.web import users as web_users
 from ledenadmin.web.security import SecurityMiddleware
 from ledenadmin.web.templating import STATIC_DIR, build_templates
 
@@ -52,6 +55,10 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.state.auth_provider = build_auth_provider(settings)
     app.state.insights = InsightService(build_insight_provider(settings))
     app.state.templates = build_templates(settings.tz)
+    app.state.kvk_lookup = build_kvk_lookup(settings.kvk_api_key, settings.kvk_api_url)
+    app.state.mail_transport = build_mail_transport(
+        settings.brevo_api_key, settings.mail_sender_email, settings.mail_sender_name
+    )
 
     app.add_middleware(AuditMiddleware)
     app.add_middleware(SecurityMiddleware, secure_cookies=settings.is_production)
@@ -65,7 +72,9 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
         api.include_router(module.router)
     org.include_router(api)
     org.include_router(web_routes.router)
+    org.include_router(web_users.org_router)
     app.include_router(org)
+    app.include_router(web_users.public_router)
     app.include_router(web_platform.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

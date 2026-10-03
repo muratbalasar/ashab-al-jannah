@@ -31,6 +31,7 @@
         {% if principal.can(Permission.REPORTS_READ) %}<li><a href="{{ org }}/rapportage">Rapportage</a></li>{% endif %}
         {% if principal.can(Permission.CATEGORIES_WRITE) %}<li><a href="{{ org }}/categorieen">Categorieën</a></li>{% endif %}
         {% if principal.can(Permission.AUDIT_READ) %}<li><a href="{{ org }}/logboek">Logboek</a></li>{% endif %}
+        {% if org and principal.can(Permission.USERS_MANAGE) %}<li><a href="{{ org }}/gebruikers">Gebruikers</a></li>{% endif %}
         {% if principal.is_superadmin %}<li><a href="/platform">Platform</a></li>{% endif %}
         <li><small title="Aangemeld als">{{ principal.name }}{% if organization %} ? {{ organization.name }}{% endif %}</small></li>
       </ul>

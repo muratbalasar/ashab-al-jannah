@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}Uitnodiging ? {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Uitnodiging</h1>
+{% if error %}
+<p role="alert" class="error">{{ error }}</p>
+<p><a href="/">Naar de startpagina</a></p>
+{% else %}
+<p>U bent uitgenodigd als <strong>{{ role_label | lower }}</strong> van <strong>{{ organization_name }}</strong>.</p>
+{% if identity_email and identity_email | lower != email %}
+<p class="info-bar">Let op: de uitnodiging is voor <strong>{{ email }}</strong>, maar u bent aangemeld als {{ identity_email }}.</p>
+{% endif %}
+<form method="post" action="/uitnodiging/{{ token }}" data-once>
+  {{ csrf(csrf_token) }}
+  <button type="submit">Uitnodiging accepteren</button>
+</form>
+{% endif %}
+{% endblock %}

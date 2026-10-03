@@ -28,6 +28,11 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(Unicode(200), nullable=False)
     kvk_number: Mapped[str | None] = mapped_column(Unicode(8), nullable=True, unique=True)
     status: Mapped[str] = mapped_column(Unicode(20), nullable=False, default="actief")
+    contact_email: Mapped[str | None] = mapped_column(Unicode(320), nullable=True)
+    city: Mapped[str | None] = mapped_column(Unicode(100), nullable=True)
+    kvk_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # Bewust geen foreign key (zie migratie 0006); alleen voor de aanmaaklimiet per gebruiker.
+    created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 
@@ -199,3 +204,36 @@ class AuditLog(Base):
     detail: Mapped[str | None] = mapped_column(Unicode(2000), nullable=True)
     ip: Mapped[str | None] = mapped_column(Unicode(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Unicode(300), nullable=True)
+
+
+class Invitation(Base):
+    """Uitnodiging voor een rol in een organisatie; alleen de hash van het token wordt bewaard."""
+
+    __tablename__ = "invitations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(Unicode(320), nullable=False)
+    role: Mapped[str] = mapped_column(Unicode(20), nullable=False)
+    member_id: Mapped[int | None] = mapped_column(
+        ForeignKey("members.id", ondelete="CASCADE"), nullable=True
+    )
+    token_hash: Mapped[str] = mapped_column(Unicode(64), nullable=False, unique=True)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime(), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    accepted_by_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[str] = mapped_column(Unicode(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+
+
+class MailCounter(Base):
+    """Aantal verstuurde mails per dag (UTC), voor de daglimiet van de maildienst."""
+
+    __tablename__ = "mail_counters"
+
+    day: Mapped[str] = mapped_column(Unicode(10), primary_key=True)
+    sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

@@ -32,6 +32,21 @@ class Settings(BaseSettings):
     role_claim_type: str = "roles"
     # Komma-gescheiden 'issuer|subject' van platformbeheerders (superadmin).
     superadmin_subjects: str = ""
+    # Ontvangt een melding bij elke nieuwe organisatie (optioneel).
+    superadmin_email: str | None = None
+    # Publieke basis-URL voor links in e-mails, bijv. https://ledenadmin.example.nl
+    public_base_url: str = "http://localhost:8000"
+
+    # Aanmelden van organisaties
+    kvk_api_key: str | None = None
+    kvk_api_url: str = "https://api.kvk.nl/api/v2/zoeken"
+    max_organizations_per_user: int = Field(default=3, ge=1)
+
+    # E-mail via Brevo; zonder sleutel delen beheerders de uitnodigingslink zelf.
+    brevo_api_key: str | None = None
+    mail_sender_email: str = "noreply@example.nl"
+    mail_sender_name: str = "Ashab al-Jannah"
+    mail_daily_limit: int = Field(default=300, ge=1)
 
     allow_donations_for_inactive_members: bool = False
     seed_default_categories: bool = True

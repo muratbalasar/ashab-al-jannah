@@ -33,3 +33,4 @@ class Permission(StrEnum):
     AUDIT_READ = "audit:read"
     MEMBER_FIELDS_WRITE = "member-fields:write"
     SELF_READ = "self:read"
+    USERS_MANAGE = "users:manage"

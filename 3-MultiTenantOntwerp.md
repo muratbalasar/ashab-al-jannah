@@ -332,3 +332,11 @@ Gevolgen:
   - Geen lidmaatschap, onbekende of geblokkeerde organisatie: altijd 404 (er lekt niet uit of een stichting bestaat).
   - `/` stuurt door naar je organisatie, of toont een keuzelijst bij meerdere organisaties. Oude URL's (`/leden`, ...) sturen door naar `/o/standaard/...`.
   - Superadmin via `SUPERADMIN_SUBJECTS` (`issuer|subject`, komma-gescheiden). `/platform` toont organisaties met aantal gebruikers en kan blokkeren/deblokkeren; zonder lidmaatschap ziet de superadmin geen ledengegevens.
+- **Fase 3 ? gereed.**
+  - `/aanmelden`: iedere ingelogde gebruiker maakt een stichting aan (naam, KVK, plaats, contact-e-mail) en wordt de eerste beheerder. Slug uit de naam (`-2` bij botsing). Standaardcategorie?n worden aangemaakt.
+  - KVK: altijd 8 cijfers en uniek (melding: vraag de bestaande beheerder om een uitnodiging). Met `KVK_API_KEY` ook een opzoeking in het Handelsregister; dan wordt `kvk_verified_at` gezet. Bij een storing van de API alleen de formaatcontrole.
+  - Aanmaaklimiet per gebruiker: 1 per 24 uur, maximaal `MAX_ORGANIZATIONS_PER_USER` (standaard 3).
+  - `/o/{org}/gebruikers` (recht `users:manage`, alleen beheerder): gebruikers en rollen, uitnodigen per e-mail en rol, rol verwijderen (nooit de laatste beheerder), uitnodiging intrekken. Leden worden uitgenodigd vanaf hun ledenpagina (rol `lid`, gekoppeld aan het ledenrecord).
+  - Uitnodiging: willekeurig token, alleen de SHA-256-hash wordt bewaard, 7 dagen geldig, eenmalig. Accepteren via `/uitnodiging/{token}` kan alleen als het login-e-mailadres overeenkomt.
+  - E-mail via Brevo (`BREVO_API_KEY`); zonder sleutel wordt alleen een kopieerbare link getoond. Teller per dag in `mail_counters`: waarschuwing vanaf 80%, bij `MAIL_DAILY_LIMIT` (300) geen mail meer, alleen de link. De superadmin krijgt een mail bij een nieuwe stichting (`SUPERADMIN_EMAIL`).
+  - Migratie `0006`. `organizations.created_by_user_id` heeft bewust geen foreign key (SQLite kan die niet toevoegen zonder de tabel te hercre?ren).

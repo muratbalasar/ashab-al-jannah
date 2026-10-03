@@ -6,9 +6,16 @@
   <p>Lidnummer {{ member.id }} · aangemaakt {{ member.created_at | localdt }}</p>
 </hgroup>
 
-{% with action="{{ org }}/leden/" ~ member.id, submit_label="Wijzigingen opslaan", readonly=not principal.can(Permission.MEMBERS_WRITE) %}
+{% with action=org ~ "/leden/" ~ member.id, submit_label="Wijzigingen opslaan", readonly=not principal.can(Permission.MEMBERS_WRITE) %}
   {% include "members/_form.html" %}
 {% endwith %}
+
+{% if principal.can(Permission.USERS_MANAGE) %}
+<form method="post" action="{{ org }}/leden/{{ member.id }}/uitnodigen" data-once>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="secondary">Uitnodigen voor Mijn omgeving</button>
+</form>
+{% endif %}
 
 {% if principal.can(Permission.DONATIONS_READ) %}
 <section aria-labelledby="donaties-kop">

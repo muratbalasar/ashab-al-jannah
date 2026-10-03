@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "macros.html" import field_error, invalid, form_error, csrf %}
+{% block title %}Nieuwe organisatie ? {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Nieuwe stichting of vereniging aanmelden</h1>
+<p>U wordt de eerste beheerder. Daarna nodigt u zelf penningmeesters, bestuurders en leden uit.</p>
+<form method="post" action="/aanmelden" data-once novalidate>
+  {{ csrf(csrf_token) }}
+  {{ form_error(errors) }}
+  <label for="kvk_number">KVK-nummer
+    <input id="kvk_number" name="kvk_number" type="text" inputmode="numeric" required maxlength="12"
+           placeholder="12345678" autocomplete="off" value="{{ values.get('kvk_number', '') }}" {{ invalid(errors, 'kvk_number') }}>
+    {{ field_error(errors, 'kvk_number') }}
+  </label>
+  <label for="name">Naam van de organisatie
+    <input id="name" name="name" type="text" required maxlength="200" autocomplete="organization"
+           value="{{ values.get('name', '') }}" {{ invalid(errors, 'name') }}>
+    {{ field_error(errors, 'name') }}
+  </label>
+  <label for="city">Plaats
+    <input id="city" name="city" type="text" maxlength="100" autocomplete="address-level2"
+           value="{{ values.get('city', '') }}" {{ invalid(errors, 'city') }}>
+    {{ field_error(errors, 'city') }}
+  </label>
+  <label for="contact_email">Contact-e-mail
+    <input id="contact_email" name="contact_email" type="email" required maxlength="320" inputmode="email"
+           autocomplete="email" value="{{ values.get('contact_email', '') }}" {{ invalid(errors, 'contact_email') }}>
+    {{ field_error(errors, 'contact_email') }}
+  </label>
+  <button type="submit">Organisatie aanmaken</button>
+</form>
+{% endblock %}
