@@ -33,6 +33,7 @@ class Organization(Base):
     kvk_verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     # Bewust geen foreign key (zie migratie 0006); alleen voor de aanmaaklimiet per gebruiker.
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 

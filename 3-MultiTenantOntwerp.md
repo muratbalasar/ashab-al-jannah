@@ -324,26 +324,33 @@ Gevolgen:
 
 ### 12.1 Stand van zaken
 
-- **Fase 1 ? gereed.** Tabel `organizations`, `organization_id` op alle gegevens, centrale filter in `tenancy.py`, migratie `0004`.
-- **Fase 2 ? gereed.**
+- **Fase 1 ✅ gereed.** Tabel `organizations`, `organization_id` op alle gegevens, centrale filter in `tenancy.py`, migratie `0004`.
+- **Fase 2 ✅ gereed.**
   - Tabellen `users` (issuer + subject uniek) en `memberships` (gebruiker, organisatie, rol, optioneel lid), migratie `0005`. Rol `lid` met recht `self:read`.
   - Alle pagina's en de API staan onder `/o/{slug}/...` (bijv. `/o/standaard/leden`, `/o/standaard/api/v1/members`). `/api/v1/health` blijft globaal. Een KVK-nummer in plaats van de slug stuurt door naar de slug.
   - Rollen komen uit `memberships`. Alleen in de standaardorganisatie worden rollen uit het token (Entra app-rollen of `X-Dev-Roles`) overgenomen en vastgelegd, zodat de huidige installatie blijft werken.
   - Geen lidmaatschap, onbekende of geblokkeerde organisatie: altijd 404 (er lekt niet uit of een stichting bestaat).
   - `/` stuurt door naar je organisatie, of toont een keuzelijst bij meerdere organisaties. Oude URL's (`/leden`, ...) sturen door naar `/o/standaard/...`.
   - Superadmin via `SUPERADMIN_SUBJECTS` (`issuer|subject`, komma-gescheiden). `/platform` toont organisaties met aantal gebruikers en kan blokkeren/deblokkeren; zonder lidmaatschap ziet de superadmin geen ledengegevens.
-- **Fase 3 ? gereed.**
-  - `/aanmelden`: iedere ingelogde gebruiker maakt een stichting aan (naam, KVK, plaats, contact-e-mail) en wordt de eerste beheerder. Slug uit de naam (`-2` bij botsing). Standaardcategorie?n worden aangemaakt.
+- **Fase 3 ✅ gereed.**
+  - `/aanmelden`: iedere ingelogde gebruiker maakt een stichting aan (naam, KVK, plaats, contact-e-mail) en wordt de eerste beheerder. Slug uit de naam (`-2` bij botsing). Standaardcategorieën worden aangemaakt.
   - KVK: altijd 8 cijfers en uniek (melding: vraag de bestaande beheerder om een uitnodiging). Met `KVK_API_KEY` ook een opzoeking in het Handelsregister; dan wordt `kvk_verified_at` gezet. Bij een storing van de API alleen de formaatcontrole.
   - Aanmaaklimiet per gebruiker: 1 per 24 uur, maximaal `MAX_ORGANIZATIONS_PER_USER` (standaard 3).
   - `/o/{org}/gebruikers` (recht `users:manage`, alleen beheerder): gebruikers en rollen, uitnodigen per e-mail en rol, rol verwijderen (nooit de laatste beheerder), uitnodiging intrekken. Leden worden uitgenodigd vanaf hun ledenpagina (rol `lid`, gekoppeld aan het ledenrecord).
   - Uitnodiging: willekeurig token, alleen de SHA-256-hash wordt bewaard, 7 dagen geldig, eenmalig. Accepteren via `/uitnodiging/{token}` kan alleen als het login-e-mailadres overeenkomt.
   - E-mail via Brevo (`BREVO_API_KEY`); zonder sleutel wordt alleen een kopieerbare link getoond. Teller per dag in `mail_counters`: waarschuwing vanaf 80%, bij `MAIL_DAILY_LIMIT` (300) geen mail meer, alleen de link. De superadmin krijgt een mail bij een nieuwe stichting (`SUPERADMIN_EMAIL`).
-  - Migratie `0006`. `organizations.created_by_user_id` heeft bewust geen foreign key (SQLite kan die niet toevoegen zonder de tabel te hercre?ren).
-- **Fase 4 ? code gereed; inrichting in de portal volgens [4-EntraExternalID.md](./4-EntraExternalID.md).**
+  - Migratie `0006`. `organizations.created_by_user_id` heeft bewust geen foreign key (SQLite kan die niet toevoegen zonder de tabel te hercreëren).
+- **Fase 4 ✅ code gereed; inrichting in de portal volgens [4-EntraExternalID.md](./4-EntraExternalID.md).**
   - Easy Auth: het e-mailadres wordt genegeerd als `email_verified=false` of als het geen e-mailadres is (bijv. een gebruikersnaam in `preferred_username`).
   - `EASYAUTH_LOGIN_URL` is instelbaar.
-- **Fase 5 ? gereed.**
+- **Fase 5 ✅ gereed.**
   - `/o/{org}/mijn` (recht `self:read`): eigen gegevens, jaaroverzicht per categorie en eigen donaties, met keuze uit de laatste 6 jaar. Alle queries filteren op het `member_id` uit de eigen `membership`.
   - Een lid zonder andere rol komt na inloggen direct op `/mijn`; menu-item **Mijn omgeving** voor wie gekoppeld is.
   - Leden hebben geen toegang tot ledenlijst, donaties, rapportage, API of gebruikersbeheer (403).
+- **Fase 6 ✅ gereed.**
+  - `/o/{org}/instellingen` (recht `organization:manage`, alleen beheerder):
+    - **Exporteren:** ZIP met `export.json` en CSV's (leden met extra velden, donaties, categorieën, ledenvelden, gebruikers met rol). Alleen gegevens van de eigen organisatie.
+    - **Verwijderen:** bevestigen door de slug te typen. Status wordt `verwijderd` en `deleted_at` wordt gezet (migratie `0007`); de organisatie geeft daarna 404.
+  - Na 30 dagen wordt alles definitief gewist: lidmaatschappen, uitnodigingen, leden, donaties, categorieën, ledenvelden, logboek en de organisatie zelf. Dit gebeurt bij het starten van de app en bij het openen van `/platform`.
+  - `/platform`: per organisatie KVK (met ✓ als gecontroleerd), plaats, aantal gebruikers en leden, laatste activiteit (uit het logboek) en status, plus totalen. Verwijderde organisaties kan de superadmin **herstellen** of **nu wissen**. Nog steeds geen persoonsgegevens.
+  - Een verwijderde organisatie houdt haar KVK-nummer bezet tot ze gewist is, zodat herstellen mogelijk blijft.

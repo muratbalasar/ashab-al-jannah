@@ -4,12 +4,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from ledenadmin.api.deps import CurrentIdentity, Superadmin
 from ledenadmin.domain.enums import OrganizationStatus
 from ledenadmin.domain.errors import NotFoundError
-from ledenadmin.domain.models import Membership, Organization
+from ledenadmin.domain.models import Organization
+from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import DEFAULT_SLUG
 from ledenadmin.services.user_service import UserService
 from ledenadmin.tenancy import as_platform
@@ -44,37 +45,36 @@ def home(request: Request, identity: CurrentIdentity) -> Response:
         organizations = users.organizations(users.upsert(identity))
         session.commit()
         choices = [(o.slug, o.name) for o in organizations]
-    if len(choices) == 1:
+    if len(choices) == 1 and "melding" not in request.query_params:
         return RedirectResponse(f"/o/{choices[0][0]}/", status_code=303)
     if not choices and principal.is_superadmin:
         return RedirectResponse("/platform", status_code=303)
-    return _render(request, "organizations/choose.html", {"choices": choices})
+    deleted = request.query_params.get("melding") == "verwijderd"
+    return _render(request, "organizations/choose.html", {"choices": choices, "deleted": deleted})
 
 
 @router.get("/platform")
 def platform(request: Request, principal: Superadmin) -> Response:
     with request.app.state.database.session() as session:
-        as_platform(session)
-        users = (
-            select(func.count(func.distinct(Membership.user_id)))
-            .where(Membership.organization_id == Organization.id)
-            .scalar_subquery()
-        )
-        rows = session.execute(select(Organization, users).order_by(Organization.name)).all()
-        organizations = [
-            {
-                "id": o.id,
-                "slug": o.slug,
-                "name": o.name,
-                "kvk_number": o.kvk_number,
-                "status": o.status,
-                "created_at": o.created_at,
-                "users": count,
-            }
-            for o, count in rows
-        ]
+        service = OrganizationDataService(session)
+        service.purge_expired()
+        organizations = service.overview()
     context = {"organizations": organizations, "Status": OrganizationStatus}
     return _render(request, "platform/index.html", context)
+
+
+@router.post("/platform/{organization_id}/herstellen")
+def platform_restore(organization_id: int, _: Superadmin, request: Request) -> Response:
+    with request.app.state.database.session() as session:
+        OrganizationDataService(session).restore(organization_id)
+    return RedirectResponse("/platform", status_code=303)
+
+
+@router.post("/platform/{organization_id}/wissen")
+def platform_purge(organization_id: int, _: Superadmin, request: Request) -> Response:
+    with request.app.state.database.session() as session:
+        OrganizationDataService(session).purge(organization_id)
+    return RedirectResponse("/platform", status_code=303)
 
 
 @router.post("/platform/{organization_id}/status")
@@ -84,12 +84,12 @@ def platform_status(
     request: Request,
     status: Annotated[str, Form()] = "",
 ) -> Response:
-    if status not in {s.value for s in OrganizationStatus}:
+    if status not in {OrganizationStatus.ACTIVE.value, OrganizationStatus.BLOCKED.value}:
         raise NotFoundError("Onbekende status")
     with request.app.state.database.session() as session:
         as_platform(session)
         organization = session.get(Organization, organization_id)
-        if organization is None:
+        if organization is None or organization.status == OrganizationStatus.DELETED:
             raise NotFoundError("Organisatie niet gevonden")
         organization.status = status
         session.commit()

@@ -2,16 +2,19 @@
 {% block title %}Platformbeheer – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Platformbeheer</h1>
-<p class="info-bar">Aantal organisaties: <strong>{{ organizations | length }}</strong></p>
+{% set active = organizations | selectattr("status", "equalto", Status.ACTIVE.value) | list %}
+<p class="info-bar">Organisaties: <strong>{{ organizations | length }}</strong> · actief: <strong>{{ active | length }}</strong> · gebruikers: <strong>{{ organizations | sum(attribute="users") }}</strong> · leden: <strong>{{ organizations | sum(attribute="members") }}</strong></p>
 <div class="overflow-auto">
   <table class="striped">
     <thead>
       <tr>
         <th scope="col">Naam</th>
-        <th scope="col">Slug</th>
         <th scope="col">KVK</th>
+        <th scope="col" class="hide-sm">Plaats</th>
         <th scope="col" class="num">Gebruikers</th>
-        <th scope="col">Aangemaakt</th>
+        <th scope="col" class="num">Leden</th>
+        <th scope="col" class="hide-sm">Aangemaakt</th>
+        <th scope="col">Laatste activiteit</th>
         <th scope="col">Status</th>
         <th scope="col"><span class="visually-hidden">Actie</span></th>
       </tr>
@@ -19,13 +22,25 @@
     <tbody>
       {% for o in organizations %}
       <tr>
-        <td>{{ o.name }}</td>
-        <td><code>{{ o.slug }}</code></td>
-        <td>{{ o.kvk_number or "–" }}</td>
+        <td>{{ o.name }}<br><small><code>{{ o.slug }}</code></small></td>
+        <td>{{ o.kvk_number or "–" }}{% if o.kvk_verified %} <small title="Gecontroleerd in het Handelsregister">✓</small>{% endif %}</td>
+        <td class="hide-sm">{{ o.city or "–" }}</td>
         <td class="num">{{ o.users }}</td>
-        <td>{{ o.created_at | localdt("%d-%m-%Y") }}</td>
-        <td>{{ o.status }}</td>
+        <td class="num">{{ o.members }}</td>
+        <td class="hide-sm">{{ o.created_at | localdt("%d-%m-%Y") }}</td>
+        <td>{{ o.last_activity | localdt("%d-%m-%Y") if o.last_activity else "–" }}</td>
+        <td>{{ o.status }}{% if o.purge_at %}<br><small>gewist op {{ o.purge_at | localdt("%d-%m-%Y") }}</small>{% endif %}</td>
         <td>
+          {% if o.status == Status.DELETED %}
+          <form method="post" action="/platform/{{ o.id }}/herstellen">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit">Herstellen</button>
+          </form>
+          <form method="post" action="/platform/{{ o.id }}/wissen" data-confirm="Organisatie {{ o.name }} en al haar gegevens nu definitief wissen?">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="contrast">Nu wissen</button>
+          </form>
+          {% else %}
           <form method="post" action="/platform/{{ o.id }}/status">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             {% if o.status == Status.ACTIVE %}
@@ -36,11 +51,12 @@
             <button type="submit">Deblokkeren</button>
             {% endif %}
           </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
-<p><small>Platformbeheer toont bewust geen leden- of donatiegegevens van organisaties.</small></p>
+<p><small>Platformbeheer toont bewust geen leden- of donatiegegevens van organisaties, alleen aantallen.</small></p>
 {% endblock %}

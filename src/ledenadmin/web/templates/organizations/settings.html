@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "macros.html" import field_error, invalid, csrf %}
+{% block title %}Instellingen – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Instellingen</h1>
+
+<article>
+  <header><strong>Alle gegevens exporteren</strong></header>
+  <p>Een ZIP-bestand met leden, donaties, categorieën, ledenvelden en gebruikers, als CSV (te openen in Excel) en als JSON.</p>
+  <a role="button" class="secondary" href="{{ org }}/instellingen/export" download>Exporteren</a>
+</article>
+
+<article>
+  <header><strong>Organisatie verwijderen</strong></header>
+  <p>De organisatie is direct niet meer bereikbaar voor alle gebruikers. Na {{ grace_days }} dagen worden alle gegevens definitief gewist. Tot die tijd kan de platformbeheerder haar herstellen.</p>
+  <p>Maak eerst een export als u de gegevens wilt bewaren.</p>
+  <form method="post" action="{{ org }}/instellingen/verwijderen" data-once novalidate>
+    {{ csrf(csrf_token) }}
+    <label for="confirm">Typ <code>{{ organization.slug }}</code> om te bevestigen
+      <input id="confirm" name="confirm" type="text" autocomplete="off" required {{ invalid(errors, 'confirm') }}>
+      {{ field_error(errors, 'confirm') }}
+    </label>
+    <button type="submit" class="contrast">Organisatie verwijderen</button>
+  </form>
+</article>
+{% endblock %}

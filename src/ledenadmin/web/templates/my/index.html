@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Mijn omgeving ? {{ app_name }}{% endblock %}
+{% block title %}Mijn omgeving – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Mijn omgeving</h1>
 {% if not member %}
@@ -23,7 +23,7 @@
       {% for y in years %}<a href="{{ org }}/mijn?jaar={{ y }}" {% if y == year %}aria-current="page"{% endif %}>{{ y }}</a> {% endfor %}
     </nav>
   </div>
-  <p class="info-bar">Totaal: <strong>{{ report.total | eur }}</strong> ? aantal donaties: <strong>{{ report.count }}</strong></p>
+  <p class="info-bar">Totaal: <strong>{{ report.total | eur }}</strong> · aantal donaties: <strong>{{ report.count }}</strong></p>
   {% if report.by_category %}
   <div class="overflow-auto">
     <table class="striped">

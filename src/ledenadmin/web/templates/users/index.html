@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "macros.html" import field_error, invalid, form_error, csrf %}
-{% block title %}Gebruikers ? {{ app_name }}{% endblock %}
+{% block title %}Gebruikers – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Gebruikers</h1>
 {% if mail_enabled and mail_quota.exhausted %}
@@ -10,7 +10,7 @@
 {% endif %}
 {% if link %}
 <article>
-  <p>{% if mailed %}De uitnodiging is per e-mail verstuurd. U kunt de link ook zelf delen:{% else %}Deel deze link met de uitgenodigde persoon (7 dagen geldig, ??n keer te gebruiken):{% endif %}</p>
+  <p>{% if mailed %}De uitnodiging is per e-mail verstuurd. U kunt de link ook zelf delen:{% else %}Deel deze link met de uitgenodigde persoon (7 dagen geldig, één keer te gebruiken):{% endif %}</p>
   <input type="text" readonly value="{{ link }}" aria-label="Uitnodigingslink" data-select-all>
 </article>
 {% endif %}

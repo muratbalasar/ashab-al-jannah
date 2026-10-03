@@ -16,6 +16,7 @@ from ledenadmin.services.ai.insight_service import InsightService, build_insight
 from ledenadmin.services.category_service import CategoryService
 from ledenadmin.services.kvk_service import build_kvk_lookup
 from ledenadmin.services.mail_service import build_mail_transport
+from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.web import platform as web_platform
 from ledenadmin.web import routes as web_routes
@@ -35,6 +36,8 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         with database.session() as session:
             app.state.organization_id = ensure_default_organization(session)
+            if purged := OrganizationDataService(session).purge_expired():
+                logger.info("%s verwijderde organisatie(s) definitief gewist", purged)
         if settings.seed_default_categories:
             with database.session(app.state.organization_id) as session:
                 if CategoryService(session).ensure_defaults():

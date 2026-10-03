@@ -114,7 +114,7 @@ class OrganizationService:
                 "Neem contact op met de beheerder van het platform."
             )
         if any(utcnow() - moment < CREATE_INTERVAL for moment in created):
-            raise BusinessRuleError("U kunt ??n organisatie per 24 uur aanmaken.")
+            raise BusinessRuleError("U kunt één organisatie per 24 uur aanmaken.")
 
     def _unique_slug(self, base: str) -> str:
         if base in RESERVED_SLUGS:

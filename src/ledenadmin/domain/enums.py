@@ -16,6 +16,8 @@ class Role(StrEnum):
 class OrganizationStatus(StrEnum):
     ACTIVE = "actief"
     BLOCKED = "geblokkeerd"
+    # Zacht verwijderd: na de bewaartermijn worden alle gegevens definitief gewist.
+    DELETED = "verwijderd"
 
 
 class Permission(StrEnum):
@@ -34,3 +36,4 @@ class Permission(StrEnum):
     MEMBER_FIELDS_WRITE = "member-fields:write"
     SELF_READ = "self:read"
     USERS_MANAGE = "users:manage"
+    ORGANIZATION_MANAGE = "organization:manage"

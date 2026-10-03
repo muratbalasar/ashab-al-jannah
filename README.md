@@ -362,7 +362,7 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 | `SUPERADMIN_EMAIL` | leeg | Ontvangt een mail bij elke nieuwe organisatie |
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Basis-URL voor uitnodigingslinks |
 | `KVK_API_KEY` | leeg | Optioneel: KVK-nummer opzoeken in het Handelsregister bij aanmelden |
-| `MAX_ORGANIZATIONS_PER_USER` | `3` | Maximaal aantal organisaties dat ??n gebruiker aanmaakt (en 1 per 24 uur) |
+| `MAX_ORGANIZATIONS_PER_USER` | `3` | Maximaal aantal organisaties dat één gebruiker aanmaakt (en 1 per 24 uur) |
 | `BREVO_API_KEY` | leeg | Optioneel: uitnodigingen mailen via Brevo; zonder sleutel alleen een kopieerbare link |
 | `MAIL_SENDER_EMAIL` / `MAIL_SENDER_NAME` | `noreply@example.nl` / `Ashab al-Jannah` | Afzender van e-mails |
 | `MAIL_DAILY_LIMIT` | `300` | E-mails per dag (gratis Brevo-limiet); waarschuwing vanaf 80% |

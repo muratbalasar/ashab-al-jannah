@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from ledenadmin.api.deps import CurrentIdentity, require
 from ledenadmin.auth.principal import Principal
+from ledenadmin.db import utcnow
 from ledenadmin.domain.enums import Permission, Role
 from ledenadmin.domain.errors import DomainError, NotFoundError
 from ledenadmin.domain.models import Invitation, Member, Organization
@@ -19,6 +20,7 @@ from ledenadmin.services.invitation_service import (
     find_open_invitation,
 )
 from ledenadmin.services.mail_service import Mail, MailService
+from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import NewOrganization, OrganizationService
 from ledenadmin.services.user_service import UserService
 from ledenadmin.tenancy import as_platform
@@ -178,6 +180,46 @@ def member_invite(request: Request, member_id: int, principal: CanManageUsers) -
         return _users_page(
             request, session, link=invitation_link(request, created.token), mailed=mailed
         )
+
+
+# ── Instellingen: export en verwijderen (AVG) ────────────────────────────────
+
+CanManageOrganization = Annotated[Principal, Depends(require(Permission.ORGANIZATION_MANAGE))]
+GRACE_DAYS = 30
+
+
+def _settings_page(request: Request, errors=None, status_code=200) -> Response:
+    context = {"errors": errors or {}, "grace_days": GRACE_DAYS}
+    return render(request, "organizations/settings.html", context, status_code)
+
+
+@org_router.get("/instellingen")
+def settings_index(request: Request, _: CanManageOrganization) -> Response:
+    return _settings_page(request)
+
+
+@org_router.get("/instellingen/export")
+def settings_export(request: Request, _: CanManageOrganization) -> Response:
+    organization = request.state.organization
+    with _platform_session(request) as session:
+        content = OrganizationDataService(session).export(organization.id)
+    filename = f"export-{organization.slug}-{utcnow():%Y%m%d}.zip"
+    return Response(
+        content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@org_router.post("/instellingen/verwijderen")
+def settings_delete(request: Request, _: CanManageOrganization, confirm: FormText = "") -> Response:
+    organization = request.state.organization
+    if confirm.strip() != organization.slug:
+        errors = {"confirm": f"Typ precies '{organization.slug}' om te bevestigen."}
+        return _settings_page(request, errors, 422)
+    with _platform_session(request) as session:
+        OrganizationDataService(session).soft_delete(organization.id)
+    return RedirectResponse("/?melding=verwijderd", status_code=303)
 
 
 # ── Organisatie aanmelden ────────────────────────────────────────────────────

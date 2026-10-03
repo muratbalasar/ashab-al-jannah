@@ -25,7 +25,7 @@ def upgrade() -> None:
     op.add_column("organizations", sa.Column("contact_email", sa.Unicode(length=320)))
     op.add_column("organizations", sa.Column("city", sa.Unicode(length=100)))
     op.add_column("organizations", sa.Column("kvk_verified_at", ledenadmin.db.UTCDateTime()))
-    # Zonder foreign key: SQLite kan die niet toevoegen zonder de tabel te hercre?ren.
+    # Zonder foreign key: SQLite kan die niet toevoegen zonder de tabel te hercreëren.
     op.add_column("organizations", sa.Column("created_by_user_id", sa.Integer()))
     op.create_index(
         op.f("ix_organizations_created_by_user_id"), "organizations", ["created_by_user_id"]
