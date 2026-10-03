@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from ledenadmin.config import AuthMode, Settings
 from ledenadmin.db import Database
 from ledenadmin.main import create_app
+from ledenadmin.services import category_service
 from ledenadmin.services.category_service import CategoryService
 from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.web.security import CSRF_COOKIE
@@ -56,3 +57,16 @@ def csrf_client(client: TestClient) -> TestClient:
     client.get("/")
     client.csrf = client.cookies[CSRF_COOKIE]
     return client
+
+
+# De unittests gebruiken een vaste, kleine set categorie?n (los van de productie-standaard).
+TEST_CATEGORIES = {
+    "Contributie": ["Jaarlijks", "Maandelijks"],
+    "Donatie": ["Algemeen", "Project"],
+    "Sponsoring": ["MKB", "Particulier"],
+}
+
+
+@pytest.fixture(autouse=True)
+def _test_categories(monkeypatch) -> None:
+    monkeypatch.setattr(category_service, "DEFAULT_CATEGORIES", TEST_CATEGORIES)

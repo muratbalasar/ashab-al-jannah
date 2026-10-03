@@ -8,9 +8,9 @@ Test Tags           US02    donaties    backend
 *** Test Cases ***
 Donatie registreren met standaarddatum
     Given lid "Jan Jansen" bestaat
-    When de penningmeester een donatie van 50.00 euro registreert in "Sponsoring" / "MKB"
+    When de penningmeester een donatie van 50.00 euro registreert in "Sadaka" / "Waterput"
     Then is precies één donatie geregistreerd voor dat lid
-    And bevat de donatie het bedrag "50.00", categorie "Sponsoring" en subcategorie "MKB"
+    And bevat de donatie het bedrag "50.00", categorie "Sadaka" en subcategorie "Waterput"
     And ligt het tijdstip rond het moment van opslaan
 
 Donatie registreren met aangepaste datum

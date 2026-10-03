@@ -24,7 +24,7 @@ Rapportage per lid en periode
 
 Rapportage filtert op categorie
     [Tags]    US06
-    Given een lid heeft donaties in "Sponsoring" en "Contributie"
+    Given een lid heeft donaties in "Sadaka" en "Contributie"
     When de penningmeester filtert op categorie "Contributie"
     Then bevat de rapportage alleen donaties in categorie "Contributie"
 
@@ -91,7 +91,7 @@ is het totaal gelijk aan de som van de getoonde donaties
 een lid heeft donaties in "${eerste}" en "${tweede}"
     ${lid}=    Maak lid aan    Categorie Lid
     Set Test Variable    ${LID}    ${lid}
-    Registreer donatie    ${lid}[id]    40.00    ${eerste}    MKB
+    Registreer donatie    ${lid}[id]    40.00    ${eerste}    Waterput
     Registreer donatie    ${lid}[id]    12.00    ${tweede}    Jaarlijks
 
 de penningmeester filtert op categorie "${categorie}"

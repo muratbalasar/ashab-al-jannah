@@ -57,7 +57,7 @@ Subcategorie-id van
     Fail    Subcategorie ${categorie} / ${subcategorie} bestaat niet
 
 Registreer donatie
-    [Arguments]    ${lid_id}    ${bedrag}    ${categorie}=Sponsoring    ${subcategorie}=MKB
+    [Arguments]    ${lid_id}    ${bedrag}    ${categorie}=Sadaka    ${subcategorie}=Waterput
     ...    ${datum}=${NONE}    ${expected_status}=201
     ${sub_id}=    Subcategorie-id van    ${categorie}    ${subcategorie}
     ${body}=    Create Dictionary    member_id=${lid_id}    subcategory_id=${sub_id}    amount=${bedrag}

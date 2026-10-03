@@ -1,14 +1,22 @@
 import pytest
+from conftest import TEST_CATEGORIES
 
 from ledenadmin.domain.errors import ConflictError, NotFoundError
 from ledenadmin.services.category_service import DEFAULT_CATEGORIES, CategoryService
+
+
+def test_production_defaults_fit_islamic_foundation() -> None:
+    for name in ("Zakat", "Sadaka", "Ramadan", "Kurban", "Contributie"):
+        assert name in DEFAULT_CATEGORIES
+    assert "Iftar" in DEFAULT_CATEGORIES["Ramadan"]
+    assert all(subs and len(set(subs)) == len(subs) for subs in DEFAULT_CATEGORIES.values())
 
 
 def test_defaults_are_seeded_once(session) -> None:
     service = CategoryService(session)
 
     assert service.ensure_defaults() is False
-    assert {c.name for c in service.list()} == set(DEFAULT_CATEGORIES)
+    assert {c.name for c in service.list()} == set(TEST_CATEGORIES)
     sponsoring = next(c for c in service.list() if c.name == "Sponsoring")
     assert [s.name for s in sponsoring.subcategories] == ["MKB", "Particulier"]
 
