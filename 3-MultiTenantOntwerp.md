@@ -1,4 +1,4 @@
-# Technisch ontwerp: multi-tenant en self-service
+﻿# Technisch ontwerp: multi-tenant en self-service
 
 Status: **concept, ter bespreking**. Open beslissingen staan in [§ 11](#11-open-beslissingen).
 
@@ -256,20 +256,22 @@ iedereen. Zet de database daarom op **doorbetalen bij overschrijding** in plaats
 pauzeren, en stel een budgetwaarschuwing in. Als alternatief kan PostgreSQL op de
 Container Apps-omgeving draaien, maar dat kost meer beheer.
 
-## 11. Open beslissingen
+## 11. Besluiten (3 oktober 2026)
 
-1. **KVK-controle:** optie 1 (betaald API-abonnement, ± € 6,40 p/m) of optie 2 (gratis,
-   alleen formaat en uniek)?
-2. **Nieuwe stichtingen:** direct actief met limieten (voorstel), of eerst goedkeuring door de
-   superadmin?
-3. **E-mail voor uitnodigingen:** Azure Communication Services, Brevo, of alleen link kopiëren?
-4. **Rol lid:** mogen leden zichzelf koppelen via een gelijk e-mailadres, of alleen via een
-   uitnodiging?
-5. **Database bij overschrijding:** pauzeren (gratis, maar onbeschikbaar) of doorbetalen?
-6. **URL-structuur:** organisatie in de URL (`/o/stichting-al-fajr/leden`) of alleen in de
-   sessie? Voorstel: in de URL, omdat dat bladwijzers en meerdere tabbladen met
-   verschillende stichtingen ondersteunt.
+| # | Onderwerp | Besluit |
+|---|---|---|
+| 1 | KVK-controle | Gratis: controle op formaat (8 cijfers) en maximaal één stichting per KVK-nummer. Is er een `KVK_API_KEY`, dan controleert de app ook via de KVK-API. |
+| 2 | Nieuwe stichting | Direct actief, **zonder limieten**. De superadmin krijgt een melding (e-mail en het overzicht in `/platform`). § 6.4 vervalt, op de aanmaaklimiet per gebruiker na. |
+| 3 | E-mail | **Brevo** (gratis tot 300 mails per dag) én altijd de mogelijkheid om de link te kopiëren en zelf te delen. De app telt de mails per dag. Bij 80% verschijnt een waarschuwing in een infobalk. Bij 300 mails blokkeert de app het versturen tot de volgende dag, met een melding dat de link handmatig gedeeld moet worden. |
+| 4 | Rol lid | Alleen via een uitnodiging van de beheerder; leden kunnen zichzelf niet koppelen. |
+| 5 | Database | **SQLite-bestand** op het volume van de container, met **Litestream** dat continu een back-up naar Azure Blob Storage maakt (een paar cent per maand). Bij het opstarten zet Litestream de database terug. Daarom draait er maximaal **1 replica** (`maxReplicas=1`). Hetzelfde model als lokaal, dus geen verschil tussen ontwikkeling en productie. Azure SQL vervalt; de rekentijdgrens uit § 10 speelt daarmee niet meer. Kies `minReplicas=0`, met een paar seconden opstarttijd, of `minReplicas=1`, dat meer van het gratis tegoed gebruikt. |
+| 6 | URL | `/o/{slug}/...`, bijvoorbeeld `/o/stichting-al-fajr/leden`. Het KVK-nummer werkt ook als verwijzing: `/o/12345678/leden` leidt door naar de slug. De slug is te wijzigen; oude slugs blijven doorverwijzen. |
 
+Gevolgen:
+- Het KVK-nummer wordt **verplicht en uniek** voor `Organization`.
+- SQLite kan maar door één proces tegelijk beschreven worden. Dat is voldoende voor tientallen
+  stichtingen met weinig gelijktijdige schrijfacties; de schaalgrens wordt bewaakt.
+  Overstappen naar PostgreSQL blijft mogelijk via SQLAlchemy.
 ## 12. Fasering
 
 | Fase | Inhoud | Resultaat |
