@@ -3,10 +3,8 @@
 {% block content %}
 <h1>Help</h1>
 <p>Deze handleiding toont alleen de onderdelen die u met uw rol kunt gebruiken.</p>
-<nav aria-label="Inhoud handleiding">
-  <ul>
-    {% for anchor, title in sections %}<li><a href="#{{ anchor }}">{{ title }}</a></li>{% endfor %}
-  </ul>
+<nav aria-label="Inhoud handleiding" class="help-toc">
+  {% for anchor, title in sections %}<a href="#{{ anchor }}">{{ title }}</a>{% endfor %}
 </nav>
 {% for anchor, title in sections %}
 <article id="{{ anchor }}" aria-labelledby="h-{{ anchor }}">

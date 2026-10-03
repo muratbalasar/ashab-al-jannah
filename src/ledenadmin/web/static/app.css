@@ -639,3 +639,27 @@ form.role-chip button {
   border-radius: 999px;
   font-size: 0.8rem;
 }
+
+/* Help: inhoudsopgave als raster van tegels. */
+.help-toc {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 2rem;
+}
+.help-toc a {
+  display: block;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-left: 4px solid var(--pico-primary);
+  border-radius: var(--pico-border-radius);
+  text-decoration: none;
+  background: var(--pico-card-background-color);
+}
+.help-toc a:hover,
+.help-toc a:focus-visible {
+  background: var(--pico-primary-focus);
+}
+article[id] {
+  scroll-margin-top: 1rem;
+}
