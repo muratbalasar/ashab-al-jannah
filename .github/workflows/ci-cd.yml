@@ -40,7 +40,7 @@ jobs:
     name: "Kwaliteit & unit tests"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-python@v5
         with:
@@ -79,7 +79,7 @@ jobs:
     name: "Dependency security scan (pip-audit)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -100,7 +100,7 @@ jobs:
       AUTH_MODE: dev
       DATABASE_URL: sqlite:///./output/robot.db
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
@@ -161,7 +161,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [kwaliteit, security-scan]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
 
       - name: Image bouwen
@@ -213,7 +213,7 @@ jobs:
     name: "SAST & secret scan (Bandit, Gitleaks)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # volledige historie voor de secret scan
       - uses: actions/setup-python@v5
@@ -237,7 +237,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v4
         with:
           languages: python, javascript
@@ -258,7 +258,7 @@ jobs:
     outputs:
       image: ${{ steps.image.outputs.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
 
       - name: Image-naam bepalen
@@ -302,7 +302,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Inloggen bij Azure (OIDC)
         uses: azure/login@v2
