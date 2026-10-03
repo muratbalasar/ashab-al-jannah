@@ -2,7 +2,7 @@
 {% block title %}Logboek – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Logboek</h1>
-<form method="get" action="/logboek" class="grid" hx-get="/logboek" hx-trigger="input delay:300ms, change" hx-target="#audit-results" hx-select="#audit-results" hx-swap="outerHTML" hx-push-url="true">
+<form method="get" action="{{ org }}/logboek" class="grid" hx-get="{{ org }}/logboek" hx-trigger="input delay:300ms, change" hx-target="#audit-results" hx-select="#audit-results" hx-swap="outerHTML" hx-push-url="true">
   <label for="gebruiker">Gebruiker
     <input id="gebruiker" name="gebruiker" type="search" value="{{ gebruiker }}" placeholder="Naam bevat…">
   </label>

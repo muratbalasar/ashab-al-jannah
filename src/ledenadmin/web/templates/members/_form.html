@@ -34,7 +34,7 @@
   {% endif %}
   {% endfor %}
   {% if principal and principal.can(Permission.MEMBER_FIELDS_WRITE) and not readonly %}
-  <p><small>{% if not extra_fields %}Nog geen extra velden. {% endif %}<a href="/ledenvelden">Extra velden toevoegen of beheren</a></small></p>
+  <p><small>{% if not extra_fields %}Nog geen extra velden. {% endif %}<a href="{{ org }}/ledenvelden">Extra velden toevoegen of beheren</a></small></p>
   {% endif %}
   <fieldset>
     <legend>Status</legend>

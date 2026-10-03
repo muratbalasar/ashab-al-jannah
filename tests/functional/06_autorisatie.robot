@@ -76,6 +76,6 @@ kan de beheerder de CSV-export downloaden
 
 een formulier zonder CSRF-token wordt verstuurd
     ${form}=    Create Dictionary    name=Zonder Token    email=geen-token@example.nl
-    ${resp}=    POST On Session    api    /leden    data=${form}    headers=${BEHEERDER}
+    ${resp}=    POST On Session    api    /o/standaard/leden    data=${form}    headers=${BEHEERDER}
     ...    expected_status=anything
     Set Test Variable    ${RESP}    ${resp}

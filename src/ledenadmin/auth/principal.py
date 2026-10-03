@@ -18,13 +18,34 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         }
     ),
     Role.BESTUURDER: frozenset({Permission.REPORTS_READ, Permission.INSIGHTS_READ}),
+    # Een lid ziet alleen eigen gegevens (selfservice volgt in fase 3).
+    Role.LID: frozenset({Permission.SELF_READ}),
 }
+
+
+@dataclass(frozen=True)
+class Identity:
+    """Wie er is aangemeld, los van een organisatie; komt van de identity provider."""
+
+    issuer: str
+    subject: str
+    name: str
+    email: str | None = None
+    # Rollen uit het token/de dev-headers; alleen gebruikt om de standaardorganisatie te vullen.
+    claimed_roles: frozenset[Role] = frozenset()
+
+    @property
+    def key(self) -> str:
+        return f"{self.issuer}|{self.subject}"
 
 
 @dataclass(frozen=True)
 class Principal:
     name: str
     roles: frozenset[Role]
+    user_id: int | None = None
+    organization_id: int | None = None
+    is_superadmin: bool = False
 
     @property
     def permissions(self) -> frozenset[Permission]:

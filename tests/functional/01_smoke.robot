@@ -7,7 +7,7 @@ Test Tags           smoke
 
 *** Test Cases ***
 De API is operationeel
-    ${resp}=    GET On Session    api    ${API}/health    expected_status=200
+    ${resp}=    GET On Session    api    /api/v1/health    expected_status=200
     Should Be Equal    ${resp.json()}[status]    healthy
 
 De applicatie levert beveiligingsheaders

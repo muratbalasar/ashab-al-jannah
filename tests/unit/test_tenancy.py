@@ -68,12 +68,14 @@ def test_web_and_api_never_show_other_organization(client, other_org, database) 
     with database.session(other_org) as other:
         member_id = other.scalar(select(Member.id))
 
-    assert "Geheim Lid" not in client.get("/leden", headers=BEHEERDER).text
-    assert "Geheim veld" not in client.get("/ledenvelden", headers=BEHEERDER).text
-    assert client.get(f"/leden/{member_id}", headers=BEHEERDER).status_code == 404
-    assert client.get(f"/api/v1/members/{member_id}", headers=BEHEERDER).status_code == 404
-    assert client.get("/api/v1/members", headers=BEHEERDER).json() == []
-    assert "99,00" not in client.get("/donaties", headers=BEHEERDER).text
+    assert "Geheim Lid" not in client.get("/o/standaard/leden", headers=BEHEERDER).text
+    assert "Geheim veld" not in client.get("/o/standaard/ledenvelden", headers=BEHEERDER).text
+    assert client.get(f"/o/standaard/leden/{member_id}", headers=BEHEERDER).status_code == 404
+    assert (
+        client.get(f"/o/standaard/api/v1/members/{member_id}", headers=BEHEERDER).status_code == 404
+    )
+    assert client.get("/o/standaard/api/v1/members", headers=BEHEERDER).json() == []
+    assert "99,00" not in client.get("/o/standaard/donaties", headers=BEHEERDER).text
 
 
 def test_audit_log_is_per_organization(client, database, other_org) -> None:
@@ -84,13 +86,13 @@ def test_audit_log_is_per_organization(client, database, other_org) -> None:
                 user="Spion",
                 action="weergave",
                 method="GET",
-                path="/leden",
+                path="/o/standaard/leden",
             )
         )
         session.commit()
-    client.get("/leden", headers={"X-Dev-User": "Omar"})
+    client.get("/o/standaard/leden", headers={"X-Dev-User": "Omar"})
 
-    html = client.get("/logboek", headers=BEHEERDER).text
+    html = client.get("/o/standaard/logboek", headers=BEHEERDER).text
     assert "Omar" in html and "Spion" not in html
 
 

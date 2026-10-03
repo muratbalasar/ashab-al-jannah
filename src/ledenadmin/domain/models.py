@@ -31,6 +31,42 @@ class Organization(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 
+class User(Base):
+    """Een aangemelde persoon, herkend aan issuer + subject van de identity provider."""
+
+    __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("issuer", "subject"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    issuer: Mapped[str] = mapped_column(Unicode(300), nullable=False)
+    subject: Mapped[str] = mapped_column(Unicode(200), nullable=False)
+    email: Mapped[str | None] = mapped_column(Unicode(320), nullable=True, index=True)
+    display_name: Mapped[str] = mapped_column(Unicode(200), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+    last_login_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+
+
+class Membership(Base):
+    """Rol van een gebruiker binnen één organisatie; één rij per rol."""
+
+    __tablename__ = "memberships"
+    __table_args__ = (UniqueConstraint("user_id", "organization_id", "role"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(Unicode(20), nullable=False)
+    # Alleen bij rol 'lid': het ledenrecord van deze gebruiker.
+    member_id: Mapped[int | None] = mapped_column(
+        ForeignKey("members.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+
+
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(

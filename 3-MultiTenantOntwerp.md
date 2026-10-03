@@ -321,3 +321,14 @@ Gevolgen:
 | 5 | Rol lid en `/mijn`-omgeving | Leden zien hun eigen gegevens |
 | 6 | Export en verwijderen per stichting, platformoverzicht | AVG-compleet |
 | 7 | Zelf doneren via Mollie Connect | Online donaties |
+
+### 12.1 Stand van zaken
+
+- **Fase 1 ? gereed.** Tabel `organizations`, `organization_id` op alle gegevens, centrale filter in `tenancy.py`, migratie `0004`.
+- **Fase 2 ? gereed.**
+  - Tabellen `users` (issuer + subject uniek) en `memberships` (gebruiker, organisatie, rol, optioneel lid), migratie `0005`. Rol `lid` met recht `self:read`.
+  - Alle pagina's en de API staan onder `/o/{slug}/...` (bijv. `/o/standaard/leden`, `/o/standaard/api/v1/members`). `/api/v1/health` blijft globaal. Een KVK-nummer in plaats van de slug stuurt door naar de slug.
+  - Rollen komen uit `memberships`. Alleen in de standaardorganisatie worden rollen uit het token (Entra app-rollen of `X-Dev-Roles`) overgenomen en vastgelegd, zodat de huidige installatie blijft werken.
+  - Geen lidmaatschap, onbekende of geblokkeerde organisatie: altijd 404 (er lekt niet uit of een stichting bestaat).
+  - `/` stuurt door naar je organisatie, of toont een keuzelijst bij meerdere organisaties. Oude URL's (`/leden`, ...) sturen door naar `/o/standaard/...`.
+  - Superadmin via `SUPERADMIN_SUBJECTS` (`issuer|subject`, komma-gescheiden). `/platform` toont organisaties met aantal gebruikers en kan blokkeren/deblokkeren; zonder lidmaatschap ziet de superadmin geen ledengegevens.

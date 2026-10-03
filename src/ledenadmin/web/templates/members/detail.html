@@ -6,7 +6,7 @@
   <p>Lidnummer {{ member.id }} · aangemaakt {{ member.created_at | localdt }}</p>
 </hgroup>
 
-{% with action="/leden/" ~ member.id, submit_label="Wijzigingen opslaan", readonly=not principal.can(Permission.MEMBERS_WRITE) %}
+{% with action="{{ org }}/leden/" ~ member.id, submit_label="Wijzigingen opslaan", readonly=not principal.can(Permission.MEMBERS_WRITE) %}
   {% include "members/_form.html" %}
 {% endwith %}
 
@@ -16,14 +16,14 @@
     <h2 id="donaties-kop">Recente donaties</h2>
     <div class="actions">
       {% if principal.can(Permission.DONATIONS_WRITE) and member.is_active %}
-      <a role="button" href="/donaties/nieuw?member_id={{ member.id }}">Donatie registreren</a>
+      <a role="button" href="{{ org }}/donaties/nieuw?member_id={{ member.id }}">Donatie registreren</a>
       {% endif %}
       {% if principal.can(Permission.REPORTS_MEMBER_READ) %}
-      <a role="button" href="/rapportage?member_id={{ member.id }}">Rapportage lid</a>
+      <a role="button" href="{{ org }}/rapportage?member_id={{ member.id }}">Rapportage lid</a>
       {% endif %}
     </div>
   </div>
-  <p class="info-bar">Totaal aantal donaties: <strong>{{ donation_total }}</strong>{% if donation_total > donations | length %} · de {{ donations | length }} meest recente worden getoond. <a href="/donaties?member_id={{ member.id }}">Alle donaties van dit lid</a>{% endif %}</p>
+  <p class="info-bar">Totaal aantal donaties: <strong>{{ donation_total }}</strong>{% if donation_total > donations | length %} · de {{ donations | length }} meest recente worden getoond. <a href="{{ org }}/donaties?member_id={{ member.id }}">Alle donaties van dit lid</a>{% endif %}</p>
   {% with donations=donations, hide_member=True %}{% include "donations/_table.html" %}{% endwith %}
 </section>
 {% endif %}

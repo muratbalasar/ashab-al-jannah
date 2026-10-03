@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Platformbeheer – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Platformbeheer</h1>
+<p class="info-bar">Aantal organisaties: <strong>{{ organizations | length }}</strong></p>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr>
+        <th scope="col">Naam</th>
+        <th scope="col">Slug</th>
+        <th scope="col">KVK</th>
+        <th scope="col" class="num">Gebruikers</th>
+        <th scope="col">Aangemaakt</th>
+        <th scope="col">Status</th>
+        <th scope="col"><span class="visually-hidden">Actie</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in organizations %}
+      <tr>
+        <td>{{ o.name }}</td>
+        <td><code>{{ o.slug }}</code></td>
+        <td>{{ o.kvk_number or "–" }}</td>
+        <td class="num">{{ o.users }}</td>
+        <td>{{ o.created_at | localdt("%d-%m-%Y") }}</td>
+        <td>{{ o.status }}</td>
+        <td>
+          <form method="post" action="/platform/{{ o.id }}/status">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            {% if o.status == Status.ACTIVE %}
+            <input type="hidden" name="status" value="{{ Status.BLOCKED }}">
+            <button type="submit" class="secondary">Blokkeren</button>
+            {% else %}
+            <input type="hidden" name="status" value="{{ Status.ACTIVE }}">
+            <button type="submit">Deblokkeren</button>
+            {% endif %}
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p><small>Platformbeheer toont bewust geen leden- of donatiegegevens van organisaties.</small></p>
+{% endblock %}

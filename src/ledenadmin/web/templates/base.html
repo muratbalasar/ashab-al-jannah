@@ -12,13 +12,13 @@
   <script src="{{ url_for('static', path='vendor/chart.umd.min.js') }}?v={{ asset_version('vendor/chart.umd.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='app.js') }}?v={{ asset_version('app.js') }}" defer></script>
 </head>
-<body hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
+<body data-org="{{ org }}" hx-headers='{"X-CSRF-Token": "{{ csrf_token }}"}'>
   <a class="skip-link" href="#inhoud">Naar inhoud</a>
   <header class="container">
     <nav aria-label="Hoofdmenu">
       <ul>
         <li>
-          <a href="/" class="brand" aria-label="{{ app_name }} – startpagina">
+          <a href="{{ org }}/" class="brand" aria-label="{{ app_name }} – startpagina">
             <strong>{{ app_name }}</strong>
             <span class="brand-ar hide-sm" lang="ar" dir="rtl">{{ app_name_arabic }}</span>
           </a>
@@ -26,12 +26,13 @@
       </ul>
       {% if principal %}
       <ul>
-        {% if principal.can(Permission.MEMBERS_READ) %}<li><a href="/leden">Leden</a></li>{% endif %}
-        {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="/donaties">Donaties</a></li>{% endif %}
-        {% if principal.can(Permission.REPORTS_READ) %}<li><a href="/rapportage">Rapportage</a></li>{% endif %}
-        {% if principal.can(Permission.CATEGORIES_WRITE) %}<li><a href="/categorieen">Categorieën</a></li>{% endif %}
-        {% if principal.can(Permission.AUDIT_READ) %}<li><a href="/logboek">Logboek</a></li>{% endif %}
-        <li><small title="Aangemeld als">{{ principal.name }}</small></li>
+        {% if principal.can(Permission.MEMBERS_READ) %}<li><a href="{{ org }}/leden">Leden</a></li>{% endif %}
+        {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="{{ org }}/donaties">Donaties</a></li>{% endif %}
+        {% if principal.can(Permission.REPORTS_READ) %}<li><a href="{{ org }}/rapportage">Rapportage</a></li>{% endif %}
+        {% if principal.can(Permission.CATEGORIES_WRITE) %}<li><a href="{{ org }}/categorieen">Categorieën</a></li>{% endif %}
+        {% if principal.can(Permission.AUDIT_READ) %}<li><a href="{{ org }}/logboek">Logboek</a></li>{% endif %}
+        {% if principal.is_superadmin %}<li><a href="/platform">Platform</a></li>{% endif %}
+        <li><small title="Aangemeld als">{{ principal.name }}{% if organization %} ? {{ organization.name }}{% endif %}</small></li>
       </ul>
       {% endif %}
     </nav>

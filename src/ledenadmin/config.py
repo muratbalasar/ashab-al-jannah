@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     dev_user_name: str = "ontwikkelaar"
     dev_user_roles: str = "beheerder,penningmeester,bestuurder"
     role_claim_type: str = "roles"
+    # Komma-gescheiden 'issuer|subject' van platformbeheerders (superadmin).
+    superadmin_subjects: str = ""
 
     allow_donations_for_inactive_members: bool = False
     seed_default_categories: bool = True
@@ -45,6 +47,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def superadmins(self) -> frozenset[str]:
+        return frozenset(s.strip() for s in self.superadmin_subjects.split(",") if s.strip())
 
     @property
     def tz(self) -> ZoneInfo:

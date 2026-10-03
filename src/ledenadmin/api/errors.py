@@ -3,6 +3,7 @@ from urllib.parse import quote
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
+from ledenadmin.api.deps import OrganizationRedirect
 from ledenadmin.auth.errors import NotAuthenticatedError, PermissionDeniedError
 from ledenadmin.domain.errors import BusinessRuleError, ConflictError, DomainError, NotFoundError
 
@@ -14,7 +15,8 @@ STATUS_BY_ERROR: list[tuple[type[DomainError], int]] = [
 
 
 def is_api_request(request: Request) -> bool:
-    return request.url.path.startswith("/api/")
+    path = request.url.path
+    return path.startswith("/api/") or (path.startswith("/o/") and "/api/" in path)
 
 
 def status_for(error: DomainError) -> int:
@@ -31,6 +33,10 @@ def register_error_handlers(app: FastAPI) -> None:
         if is_api_request(request):
             return JSONResponse(body, status_code=status_for(exc))
         return _html_error(request, status_for(exc), exc.message)
+
+    @app.exception_handler(OrganizationRedirect)
+    async def _org_redirect(request: Request, exc: OrganizationRedirect) -> Response:
+        return RedirectResponse(exc.location, status.HTTP_307_TEMPORARY_REDIRECT)
 
     @app.exception_handler(NotAuthenticatedError)
     async def _not_authenticated(request: Request, exc: NotAuthenticatedError) -> Response:
@@ -56,6 +62,12 @@ def _html_error(request: Request, status_code: int, message: str) -> Response:
     return templates.TemplateResponse(
         request,
         "error.html",
-        {"status_code": status_code, "message": message},
+        {
+            "status_code": status_code,
+            "message": message,
+            "principal": None,
+            "org": "",
+            "csrf_token": getattr(request.state, "csrf_token", ""),
+        },
         status_code=status_code,
     )

@@ -3,7 +3,7 @@
 {% block title %}Donatie registreren – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Donatie registreren</h1>
-<form method="post" action="/donaties" data-once novalidate>
+<form method="post" action="{{ org }}/donaties" data-once novalidate>
   {{ csrf(csrf_token) }}
   {{ form_error(errors) }}
   {{ member_picker("member_id", "Lid", members, values.get('member_id', ''), "Kies een lid…", errors, required=True) }}

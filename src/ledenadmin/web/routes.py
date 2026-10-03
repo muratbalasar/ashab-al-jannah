@@ -85,10 +85,22 @@ def render(
         "principal": getattr(request.state, "principal", None),
         "csrf_token": request.state.csrf_token,
         "melding": melding,
+        "org": org_prefix(request),
+        "organization": getattr(request.state, "organization", None),
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code
     )
+
+
+def org_prefix(request: Request) -> str:
+    """URL-voorvoegsel van de huidige organisatie, bijv. '/o/stichting-x' (leeg erbuiten)."""
+    organization = getattr(request.state, "organization", None)
+    return f"/o/{organization.slug}" if organization is not None else ""
+
+
+def redirect(request: Request, path: str) -> RedirectResponse:
+    return RedirectResponse(org_prefix(request) + path, status_code=303)
 
 
 def is_partial(request: Request) -> bool:
@@ -161,9 +173,9 @@ def chart_data(report: Report | None) -> dict[str, Any]:
 
 
 @router.get("/")
-def home() -> Response:
+def home(request: Request, _: CurrentPrincipal) -> Response:
     # De rapportage is de startpagina; /rapportage regelt zelf de rechtencontrole.
-    return RedirectResponse("/rapportage", status_code=303)
+    return redirect(request, "/rapportage")
 
 
 # ── Leden ────────────────────────────────────────────────────────────────────
@@ -187,6 +199,7 @@ def members_list(
 
 @router.post("/leden/verwijderen")
 def members_delete(
+    request: Request,
     services: Services,
     _: _perm(Permission.MEMBERS_DELETE),
     ids: Annotated[list[int] | None, Form()] = None,
@@ -194,7 +207,7 @@ def members_delete(
     members, donations = services.members.delete_many(ids or [])
     melding = "lid-verwijderd" if members == 1 else "leden-verwijderd"
     query = urlencode({"melding": melding, "aantal": members, "donaties": donations})
-    return RedirectResponse(f"/leden?{query}", status_code=303)
+    return redirect(request, f"/leden?{query}")
 
 
 @router.get("/leden/nieuw")
@@ -244,7 +257,7 @@ def member_create(
         context |= {"values": values, "errors": domain_errors(exc)}
         return render(request, "members/new.html", context, 409)
     services.member_fields.save(member.id, extra_values)
-    return RedirectResponse(f"/leden/{member.id}?melding=lid-aangemaakt", status_code=303)
+    return redirect(request, f"/leden/{member.id}?melding=lid-aangemaakt")
 
 
 def _member_detail(request, services, principal, member, values, errors, status_code=200):
@@ -302,7 +315,7 @@ def member_update(
         return _member_detail(request, services, principal, member, values, domain_errors(exc), 409)
     services.member_fields.save(member_id, extra_values)
     # int() garandeert een lokaal pad en geldt voor CodeQL als sanitizer (geen open redirect).
-    return RedirectResponse(f"/leden/{int(member_id)}?melding=lid-bijgewerkt", status_code=303)
+    return redirect(request, f"/leden/{int(member_id)}?melding=lid-bijgewerkt")
 
 
 # ── Ledenvelden (beheerder) ─────────────────────────────────────────────────
@@ -345,21 +358,23 @@ def member_field_create(
         services.member_fields.create(label, field_type)
     except ConflictError as exc:
         return _fields_page(request, services, values, domain_errors(exc), 422)
-    return RedirectResponse("/ledenvelden?melding=veld-opgeslagen", status_code=303)
+    return redirect(request, "/ledenvelden?melding=veld-opgeslagen")
 
 
 @router.post("/ledenvelden/{field_id}/status")
 def member_field_status(
-    field_id: int, services: Services, _: CanManageFields, is_active: FormBool
+    request: Request, field_id: int, services: Services, _: CanManageFields, is_active: FormBool
 ) -> Response:
     services.member_fields.set_active(field_id, is_active)
-    return RedirectResponse("/ledenvelden?melding=veld-opgeslagen", status_code=303)
+    return redirect(request, "/ledenvelden?melding=veld-opgeslagen")
 
 
 @router.post("/ledenvelden/{field_id}/verwijderen")
-def member_field_delete(field_id: int, services: Services, _: CanManageFields) -> Response:
+def member_field_delete(
+    request: Request, field_id: int, services: Services, _: CanManageFields
+) -> Response:
     services.member_fields.delete(field_id)
-    return RedirectResponse("/ledenvelden?melding=verwijderd", status_code=303)
+    return redirect(request, "/ledenvelden?melding=verwijderd")
 
 
 # ── Logboek ──────────────────────────────────────────────────────────────────
@@ -460,18 +475,19 @@ def donation_create(
         return _donation_form(request, services, values, form_errors(exc), 422)
     except DomainError as exc:
         return _donation_form(request, services, values, domain_errors(exc), 422)
-    return RedirectResponse("/donaties?melding=donatie-geregistreerd", status_code=303)
+    return redirect(request, "/donaties?melding=donatie-geregistreerd")
 
 
 @router.post("/donaties/verwijderen")
 def donations_delete(
+    request: Request,
     services: Services,
     _: _perm(Permission.DONATIONS_DELETE),
     ids: Annotated[list[int] | None, Form()] = None,
 ) -> Response:
     count = services.donations.delete_many(ids or [])
     melding = "donatie-verwijderd" if count == 1 else "donaties-verwijderd"
-    return RedirectResponse(f"/donaties?melding={melding}&aantal={count}", status_code=303)
+    return redirect(request, f"/donaties?melding={melding}&aantal={count}")
 
 
 # ── Categorieën ──────────────────────────────────────────────────────────────
@@ -507,7 +523,7 @@ def _saved(request: Request, services: Services, category_id: int, message: str)
     if is_partial(request):
         return _categories_page(request, services)
     url = f"/categorieen?{urlencode({'melding': message})}#categorie-{int(category_id)}"
-    return RedirectResponse(url, status_code=303)
+    return redirect(request, url)
 
 
 def _save_name(
@@ -640,7 +656,7 @@ def _delete(request: Request, services: Services, delete: Callable[[], None]) ->
         return _categories_page(request, services, melding=exc.message, status_code=409)
     if is_partial(request):
         return _categories_page(request, services, melding="Verwijderd.")
-    return RedirectResponse("/categorieen?melding=verwijderd", status_code=303)
+    return redirect(request, "/categorieen?melding=verwijderd")
 
 
 @router.post("/categorieen/{category_id}/verwijderen")

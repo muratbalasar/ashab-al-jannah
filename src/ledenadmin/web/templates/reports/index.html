@@ -4,8 +4,8 @@
 {% block content %}
 <h1>Rapportage</h1>
 
-<form id="report-filter" action="/rapportage" method="get"
-      hx-get="/rapportage" hx-target="#rapport" hx-push-url="true" hx-trigger="change, submit">
+<form id="report-filter" action="{{ org }}/rapportage" method="get"
+      hx-get="{{ org }}/rapportage" hx-target="#rapport" hx-push-url="true" hx-trigger="change, submit">
   <div class="grid">
     {{ date_field("start_date", "Van", values.get('start_date', ''), errors) }}
     {{ date_field("end_date", "Tot en met", values.get('end_date', ''), errors) }}
@@ -37,7 +37,7 @@
   </div>
   <div class="filter-actions">
     <button type="submit">Toepassen</button>
-    <a role="button" href="/rapportage">Filters resetten</a>
+    <a role="button" href="{{ org }}/rapportage">Filters resetten</a>
   </div>
 </form>
 
@@ -50,7 +50,7 @@
   <h2 id="ai-kop">AI Analyse</h2>
   <p><small>Analyseert alleen totalen voor de actieve filters; namen en e-mailadressen worden niet gedeeld.</small></p>
   <button type="button"
-          hx-post="/rapportage/ai" hx-include="#report-filter" hx-target="#inzicht" hx-disabled-elt="this">
+          hx-post="{{ org }}/rapportage/ai" hx-include="#report-filter" hx-target="#inzicht" hx-disabled-elt="this">
     AI Analyse
   </button>
   <div id="inzicht" aria-live="polite"></div>

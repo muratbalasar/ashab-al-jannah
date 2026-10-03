@@ -152,7 +152,7 @@
       data.append("label", label);
       if (el.getAttribute("href")) data.append("href", el.getAttribute("href"));
       data.append("pagina", location.pathname + location.search);
-      navigator.sendBeacon("/logboek/klik", new URLSearchParams(data));
+      navigator.sendBeacon((document.body.dataset.org || "") + "/logboek/klik", new URLSearchParams(data));
     },
     true
   );

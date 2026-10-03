@@ -16,7 +16,7 @@
       <tr>
         {% if selectable %}<td class="select-col"><input type="checkbox" name="ids" value="{{ d.id }}" data-select-row aria-label="Donatie {{ d.donated_at | localdt }} {{ d.member_name }} {{ d.amount | eur }} selecteren"></td>{% endif %}
         <td>{{ d.donated_at | localdt }}</td>
-        {% if not hide_member %}<td><a href="/leden/{{ d.member_id }}">{{ d.member_name }}</a></td>{% endif %}
+        {% if not hide_member %}<td><a href="{{ org }}/leden/{{ d.member_id }}">{{ d.member_name }}</a></td>{% endif %}
         <td>{{ d.category }}</td>
         <td class="hide-sm">{{ d.subcategory }}</td>
         <td class="num">{{ d.amount | eur }}</td>

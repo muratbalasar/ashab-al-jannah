@@ -24,7 +24,7 @@ from ledenadmin.tenancy import current_organization_id
 logger = logging.getLogger("ledenadmin.audit")
 
 SESSION_COOKIE = "logboek_sessie"
-CLICK_PATH = "/logboek/klik"
+CLICK_SUFFIX = "/logboek/klik"
 SKIP_PREFIXES = ("/static/", "/api/v1/health", "/favicon")
 SKIP_FIELDS = {"csrf_token"}
 MAX_DETAIL = 2000
@@ -39,7 +39,7 @@ class Action:
 
 
 def classify(method: str, path: str) -> str:
-    if path == CLICK_PATH:
+    if path.endswith(CLICK_SUFFIX):
         return Action.CLICK
     if method == "DELETE" or path.endswith("/verwijderen"):
         return Action.DELETE
@@ -91,17 +91,19 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
 
         principal = getattr(request.state, "principal", None)
-        if principal is None:
+        identity = getattr(request.state, "identity", None) or principal
+        if identity is None:
             try:
-                principal = request.app.state.auth_provider.authenticate(request)
+                identity = request.app.state.auth_provider.authenticate(request)
             except Exception:  # pragma: no cover - authenticatie mag het loggen niet breken
-                principal = None
-        user = principal.name if principal else "anoniem"
+                identity = None
+        user = identity.name if identity else "anoniem"
         entries: list[AuditLog] = []
 
-        is_new_session = principal is not None and not request.cookies.get(SESSION_COOKIE)
+        is_new_session = identity is not None and not request.cookies.get(SESSION_COOKIE)
         if is_new_session:
-            roles = ",".join(sorted(principal.roles)) or "geen rollen"
+            roles = ",".join(sorted(principal.roles)) if principal else ""
+            roles = roles or "geen rollen"
             entries.append(self._entry(request, user, Action.LOGIN, None, f"rollen: {roles}"))
             response.set_cookie(
                 SESSION_COOKIE,
@@ -144,7 +146,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _save(request: Request, entries: list[AuditLog]) -> None:
-        organization_id = getattr(request.app.state, "organization_id", None)
+        principal = getattr(request.state, "principal", None)
+        organization_id = principal.organization_id if principal else None
         with request.app.state.database.session() as session:
             for entry in entries:
                 entry.organization_id = organization_id

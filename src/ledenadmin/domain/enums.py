@@ -10,6 +10,12 @@ class Role(StrEnum):
     BEHEERDER = "beheerder"
     PENNINGMEESTER = "penningmeester"
     BESTUURDER = "bestuurder"
+    LID = "lid"
+
+
+class OrganizationStatus(StrEnum):
+    ACTIVE = "actief"
+    BLOCKED = "geblokkeerd"
 
 
 class Permission(StrEnum):
@@ -26,3 +32,4 @@ class Permission(StrEnum):
     EXPORT = "export"
     AUDIT_READ = "audit:read"
     MEMBER_FIELDS_WRITE = "member-fields:write"
+    SELF_READ = "self:read"

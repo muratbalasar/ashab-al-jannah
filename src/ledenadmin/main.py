@@ -15,6 +15,7 @@ from ledenadmin.db import Database
 from ledenadmin.services.ai.insight_service import InsightService, build_insight_provider
 from ledenadmin.services.category_service import CategoryService
 from ledenadmin.services.organization_service import ensure_default_organization
+from ledenadmin.web import platform as web_platform
 from ledenadmin.web import routes as web_routes
 from ledenadmin.web.security import SecurityMiddleware
 from ledenadmin.web.templating import STATIC_DIR, build_templates
@@ -56,10 +57,15 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.add_middleware(SecurityMiddleware, secure_cookies=settings.is_production)
     register_error_handlers(app)
 
+    # Gegevens per organisatie: web en API onder /o/{org}/...; health blijft globaal.
+    app.include_router(system.public_router, prefix="/api/v1")
+    org = APIRouter(prefix="/o/{org}")
     api = APIRouter(prefix="/api/v1")
     for module in (system, members, categories, donations, reports):
         api.include_router(module.router)
-    app.include_router(api)
-    app.include_router(web_routes.router)
+    org.include_router(api)
+    org.include_router(web_routes.router)
+    app.include_router(org)
+    app.include_router(web_platform.router)
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

@@ -356,7 +356,8 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 | `APP_ENV` | `development` | `production` activeert de veiligheidscontroles en secure cookies |
 | `DATABASE_URL` | `sqlite:///./ledenadmin.db` | SQLAlchemy-URL; zie Azure SQL hieronder |
 | `AUTH_MODE` | `easyauth` | `dev` alleen lokaal; rollen via `DEV_USER_ROLES` of de header `X-Dev-Roles` |
-| `ROLE_CLAIM_TYPE` | `roles` | Claim met de Entra ID-app-rollen |
+| `ROLE_CLAIM_TYPE` | `roles` | Claim met de Entra ID-app-rollen (alleen voor de standaardorganisatie) |
+| `SUPERADMIN_SUBJECTS` | leeg | Platformbeheerders als `issuer\|subject`, komma-gescheiden; geeft toegang tot `/platform` |
 | `TIMEZONE` | `Europe/Amsterdam` | Weergave en periodegrenzen |
 | `AI_PROVIDER` | `local` | `local`, `openai` of `anthropic` |
 
