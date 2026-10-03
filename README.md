@@ -71,6 +71,24 @@ De lokale database (`ledenadmin.db`) blijft bewaard bij stoppen en herstarten. M
 met `-InitWithDummyData` voor een schone demo-omgeving.
 Gebruik dit alleen lokaal; met `APP_ENV=production` weigert de applicatie te starten.
 
+#### Lokaal en multi-tenant
+
+Lokaal hoeft u niets aan organisaties in te richten. Bij het starten wordt automatisch de
+organisatie **`standaard`** aangemaakt; `http://localhost:8000/` en oude URL's zoals `/leden`
+sturen door naar `/o/standaard/...`. De dev-gebruiker krijgt daar de rollen uit
+`DEV_USER_ROLES` (standaard alle). Zonder `SECRET_ENCRYPTION_KEY`, `BREVO_API_KEY` en
+`KVK_API_KEY` staan online doneren, mailen en de KVK-check uit; de rest werkt gewoon.
+
+Meerdere organisaties of rollen lokaal testen:
+
+- Nieuwe organisatie: ga naar `/aanmelden` (KVK-nummer alleen op formaat gecontroleerd).
+- Andere gebruiker/rol: stuur de headers `X-Dev-User` en `X-Dev-Roles` mee (bijv. met een
+  browserextensie), of zet `DEV_USER_NAME`/`DEV_USER_ROLES` en herstart. Uitnodigingslinks
+  verschijnen op het scherm om te kopiëren.
+- Superadmin (`/platform`): `SUPERADMIN_SUBJECTS=dev|ontwikkelaar`.
+- Mollie testen: zet `SECRET_ENCRYPTION_KEY` en koppel een `test_`-sleutel; zonder publieke
+  URL wordt de status bijgewerkt als u terugkeert van de betaalpagina.
+
 ### Optie B – Container-image met Docker (Windows en Linux)
 
 Installeer eerst Docker: op Windows [Docker Desktop](https://www.docker.com/products/docker-desktop/)
