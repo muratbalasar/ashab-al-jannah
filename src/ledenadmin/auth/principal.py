@@ -18,7 +18,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
         }
     ),
     Role.BESTUURDER: frozenset({Permission.REPORTS_READ, Permission.INSIGHTS_READ}),
-    # Een lid ziet alleen eigen gegevens (selfservice volgt in fase 3).
+    # Een lid ziet alleen eigen gegevens op /mijn.
     Role.LID: frozenset({Permission.SELF_READ}),
 }
 
@@ -46,6 +46,8 @@ class Principal:
     user_id: int | None = None
     organization_id: int | None = None
     is_superadmin: bool = False
+    # Het eigen ledenrecord (rol lid); alleen hiermee zijn /mijn-gegevens zichtbaar.
+    member_id: int | None = None
 
     @property
     def permissions(self) -> frozenset[Permission]:

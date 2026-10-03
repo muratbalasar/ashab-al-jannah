@@ -30,6 +30,7 @@ EMAIL_CLAIMS = (
     "preferred_username",
     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
 )
+EMAIL_VERIFIED_CLAIM = "email_verified"
 
 
 class AuthProvider(Protocol):
@@ -45,10 +46,9 @@ class EasyAuthProvider:
     request, zodat clients ze niet zelf kunnen meesturen.
     """
 
-    login_url = "/.auth/login/aad"
-
-    def __init__(self, role_claim_type: str = "roles") -> None:
+    def __init__(self, role_claim_type: str = "roles", login_url: str = "/.auth/login/aad") -> None:
         self._role_claim_type = role_claim_type
+        self.login_url = login_url
 
     def authenticate(self, request: Request) -> Identity | None:
         raw = request.headers.get(EASYAUTH_PRINCIPAL_HEADER)
@@ -75,6 +75,9 @@ class EasyAuthProvider:
             return None
         issuer = claim("iss") or request.headers.get(EASYAUTH_IDP_HEADER) or "onbekend"
         email = claim(*EMAIL_CLAIMS)
+        # Een expliciet niet-geverifieerd e-mailadres telt niet: het koppelt uitnodigingen.
+        if (claim(EMAIL_VERIFIED_CLAIM) or "").lower() == "false" or "@" not in (email or ""):
+            email = None
         name = (
             request.headers.get(EASYAUTH_NAME_HEADER)
             or claim(payload.get("name_typ") or "name", "name")
@@ -104,4 +107,4 @@ def build_auth_provider(settings: Settings) -> AuthProvider:
     if settings.auth_mode == AuthMode.DEV:
         logger.warning("AUTH_MODE=dev actief: authenticatie is uitgeschakeld (alleen lokaal!)")
         return DevAuthProvider(settings.dev_user_name, settings.dev_user_roles)
-    return EasyAuthProvider(settings.role_claim_type)
+    return EasyAuthProvider(settings.role_claim_type, settings.easyauth_login_url)

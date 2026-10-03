@@ -173,9 +173,33 @@ def chart_data(report: Report | None) -> dict[str, Any]:
 
 
 @router.get("/")
-def home(request: Request, _: CurrentPrincipal) -> Response:
-    # De rapportage is de startpagina; /rapportage regelt zelf de rechtencontrole.
+def home(request: Request, principal: CurrentPrincipal) -> Response:
+    # De rapportage is de startpagina; een lid zonder andere rol gaat naar 'Mijn omgeving'.
+    if not principal.can(Permission.REPORTS_READ) and principal.can(Permission.SELF_READ):
+        return redirect(request, "/mijn")
     return redirect(request, "/rapportage")
+
+
+# ?? Mijn omgeving (rol lid) ??????????????????????????????????????????????????
+
+
+@router.get("/mijn")
+def my_overview(
+    request: Request, services: Services, principal: _perm(Permission.SELF_READ)
+) -> Response:
+    """Eigen gegevens en donaties; alle queries filteren op het gekoppelde ledenrecord."""
+    if principal.member_id is None:
+        return render(request, "my/index.html", {"member": None})
+    member = services.members.get(principal.member_id)
+    current = today(request).year
+    years = list(range(current, current - 6, -1))
+    raw_year = request.query_params.get("jaar", "")
+    year = int(raw_year) if raw_year.isdigit() and int(raw_year) in years else current
+    report = services.reports.build(
+        ReportFilter(start_date=date(year, 1, 1), end_date=date(year, 12, 31), member_id=member.id)
+    )
+    context = {"member": member, "report": report, "year": year, "years": years}
+    return render(request, "my/index.html", context)
 
 
 # ── Leden ────────────────────────────────────────────────────────────────────

@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     role_claim_type: str = "roles"
     # Komma-gescheiden 'issuer|subject' van platformbeheerders (superadmin).
     superadmin_subjects: str = ""
+    # Inlogpagina van Easy Auth; voor Entra External ID meestal /.auth/login/aad.
+    easyauth_login_url: str = "/.auth/login/aad"
     # Ontvangt een melding bij elke nieuwe organisatie (optioneel).
     superadmin_email: str | None = None
     # Publieke basis-URL voor links in e-mails, bijv. https://ledenadmin.example.nl

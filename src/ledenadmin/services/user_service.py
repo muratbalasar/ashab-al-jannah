@@ -88,12 +88,14 @@ class UserService:
         """
         user = self.upsert(identity)
         roles: frozenset[Role] = frozenset()
+        member_id: int | None = None
         if organization is not None:
             if identity.claimed_roles and organization.slug == DEFAULT_SLUG:
                 self.grant(user, organization.id, identity.claimed_roles)
                 roles = identity.claimed_roles
             else:
                 roles = self.roles_in(user, organization.id)
+            member_id = self.member_id_in(user, organization.id)
         self._session.commit()
         return Principal(
             name=identity.name,
@@ -101,4 +103,15 @@ class UserService:
             user_id=user.id,
             organization_id=organization.id if organization else None,
             is_superadmin=self.is_superadmin(identity),
+            member_id=member_id,
+        )
+
+    def member_id_in(self, user: User, organization_id: int) -> int | None:
+        return self._session.scalar(
+            select(Membership.member_id).where(
+                Membership.user_id == user.id,
+                Membership.organization_id == organization_id,
+                Membership.role == Role.LID.value,
+                Membership.member_id.is_not(None),
+            )
         )

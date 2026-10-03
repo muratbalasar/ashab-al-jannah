@@ -59,6 +59,28 @@ def test_easyauth_supports_role_typ_and_name_header() -> None:
     assert identity.claimed_roles == {Role.BESTUURDER}
 
 
+@pytest.mark.parametrize(
+    ("claims", "expected"),
+    [
+        ([{"typ": "email", "val": "a@b.nl"}, {"typ": "email_verified", "val": "true"}], "a@b.nl"),
+        ([{"typ": "email", "val": "a@b.nl"}, {"typ": "email_verified", "val": "False"}], None),
+        ([{"typ": "emails", "val": "a@b.nl"}], "a@b.nl"),
+        ([{"typ": "preferred_username", "val": "gebruikersnaam"}], None),
+    ],
+)
+def test_easyauth_only_uses_verified_email(claims, expected) -> None:
+    header = easyauth_header([{"typ": "sub", "val": "s1"}, *claims])
+
+    identity = EasyAuthProvider().authenticate(request_with({"X-MS-CLIENT-PRINCIPAL": header}))
+
+    assert identity.email == expected
+
+
+def test_easyauth_login_url_is_configurable() -> None:
+    settings = Settings(auth_mode=AuthMode.EASYAUTH, easyauth_login_url="/.auth/login/extern")
+    assert build_auth_provider(settings).login_url == "/.auth/login/extern"
+
+
 def test_easyauth_without_subject_is_anonymous() -> None:
     header = easyauth_header([{"typ": "name", "val": "x"}])
 

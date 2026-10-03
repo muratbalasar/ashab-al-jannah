@@ -358,6 +358,7 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 | `AUTH_MODE` | `easyauth` | `dev` alleen lokaal; rollen via `DEV_USER_ROLES` of de header `X-Dev-Roles` |
 | `ROLE_CLAIM_TYPE` | `roles` | Claim met de Entra ID-app-rollen (alleen voor de standaardorganisatie) |
 | `SUPERADMIN_SUBJECTS` | leeg | Platformbeheerders als `issuer\|subject`, komma-gescheiden; geeft toegang tot `/platform` |
+| `EASYAUTH_LOGIN_URL` | `/.auth/login/aad` | Inlogpagina van Easy Auth; inrichting van Entra External ID: zie [4-EntraExternalID.md](4-EntraExternalID.md) |
 | `SUPERADMIN_EMAIL` | leeg | Ontvangt een mail bij elke nieuwe organisatie |
 | `PUBLIC_BASE_URL` | `http://localhost:8000` | Basis-URL voor uitnodigingslinks |
 | `KVK_API_KEY` | leeg | Optioneel: KVK-nummer opzoeken in het Handelsregister bij aanmelden |

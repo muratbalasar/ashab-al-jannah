@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Mijn omgeving ? {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Mijn omgeving</h1>
+{% if not member %}
+<p>Uw account is nog niet gekoppeld aan een ledenrecord. Vraag de beheerder van {{ organization.name if organization else "uw stichting" }} om een nieuwe uitnodiging.</p>
+{% else %}
+<article>
+  <header><strong>Mijn gegevens</strong></header>
+  <dl>
+    <dt>Naam</dt><dd>{{ member.name }}</dd>
+    <dt>E-mail</dt><dd>{{ member.email }}</dd>
+    <dt>Lidnummer</dt><dd>{{ member.id }}</dd>
+    <dt>Status</dt><dd>{{ member.status.value }}</dd>
+  </dl>
+  <small>Klopt er iets niet? Neem contact op met de beheerder van {{ organization.name }}.</small>
+</article>
+
+<section aria-labelledby="jaar-kop">
+  <div class="page-head">
+    <h2 id="jaar-kop">Jaaroverzicht {{ year }}</h2>
+    <nav aria-label="Jaar kiezen" class="actions">
+      {% for y in years %}<a href="{{ org }}/mijn?jaar={{ y }}" {% if y == year %}aria-current="page"{% endif %}>{{ y }}</a> {% endfor %}
+    </nav>
+  </div>
+  <p class="info-bar">Totaal: <strong>{{ report.total | eur }}</strong> ? aantal donaties: <strong>{{ report.count }}</strong></p>
+  {% if report.by_category %}
+  <div class="overflow-auto">
+    <table class="striped">
+      <thead><tr><th scope="col">Categorie</th><th scope="col" class="num">Aantal</th><th scope="col" class="num">Bedrag</th></tr></thead>
+      <tbody>
+        {% for b in report.by_category %}<tr><td>{{ b.label }}</td><td class="num">{{ b.count }}</td><td class="num">{{ b.total | eur }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  <h3>Donaties</h3>
+  {% with donations=report.donations, hide_member=True %}{% include "donations/_table.html" %}{% endwith %}
+</section>
+{% endif %}
+{% endblock %}

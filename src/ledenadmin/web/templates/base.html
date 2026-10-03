@@ -26,6 +26,7 @@
       </ul>
       {% if principal %}
       <ul>
+        {% if org and principal.member_id %}<li><a href="{{ org }}/mijn">Mijn omgeving</a></li>{% endif %}
         {% if principal.can(Permission.MEMBERS_READ) %}<li><a href="{{ org }}/leden">Leden</a></li>{% endif %}
         {% if principal.can(Permission.DONATIONS_READ) %}<li><a href="{{ org }}/donaties">Donaties</a></li>{% endif %}
         {% if principal.can(Permission.REPORTS_READ) %}<li><a href="{{ org }}/rapportage">Rapportage</a></li>{% endif %}

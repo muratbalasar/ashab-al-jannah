@@ -340,3 +340,10 @@ Gevolgen:
   - Uitnodiging: willekeurig token, alleen de SHA-256-hash wordt bewaard, 7 dagen geldig, eenmalig. Accepteren via `/uitnodiging/{token}` kan alleen als het login-e-mailadres overeenkomt.
   - E-mail via Brevo (`BREVO_API_KEY`); zonder sleutel wordt alleen een kopieerbare link getoond. Teller per dag in `mail_counters`: waarschuwing vanaf 80%, bij `MAIL_DAILY_LIMIT` (300) geen mail meer, alleen de link. De superadmin krijgt een mail bij een nieuwe stichting (`SUPERADMIN_EMAIL`).
   - Migratie `0006`. `organizations.created_by_user_id` heeft bewust geen foreign key (SQLite kan die niet toevoegen zonder de tabel te hercre?ren).
+- **Fase 4 ? code gereed; inrichting in de portal volgens [4-EntraExternalID.md](./4-EntraExternalID.md).**
+  - Easy Auth: het e-mailadres wordt genegeerd als `email_verified=false` of als het geen e-mailadres is (bijv. een gebruikersnaam in `preferred_username`).
+  - `EASYAUTH_LOGIN_URL` is instelbaar.
+- **Fase 5 ? gereed.**
+  - `/o/{org}/mijn` (recht `self:read`): eigen gegevens, jaaroverzicht per categorie en eigen donaties, met keuze uit de laatste 6 jaar. Alle queries filteren op het `member_id` uit de eigen `membership`.
+  - Een lid zonder andere rol komt na inloggen direct op `/mijn`; menu-item **Mijn omgeving** voor wie gekoppeld is.
+  - Leden hebben geen toegang tot ledenlijst, donaties, rapportage, API of gebruikersbeheer (403).
