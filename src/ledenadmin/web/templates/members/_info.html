@@ -1,0 +1,1 @@
+<p id="leden-info" class="info-bar" aria-live="polite"{% if partial %} hx-swap-oob="true"{% endif %}>{% if q or status %}Gevonden leden{% else %}Totaal aantal leden{% endif %}: <strong>{{ members | length }}</strong></p>

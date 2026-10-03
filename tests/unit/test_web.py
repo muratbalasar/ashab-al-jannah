@@ -24,6 +24,20 @@ def test_app_name_is_shown_in_title_and_header(client) -> None:
     assert client.get("/api/openapi.json").json()["info"]["title"].startswith("Ashab al-Jannah")
 
 
+def test_members_list_shows_total_count_when_filtered(client, session) -> None:
+    add_member(session, name="Actief lid", email="actief@x.nl")
+    inactive_member = add_member(session, name="Inactief lid", email="inactief@x.nl")
+    inactive_member.status = MemberStatus.INACTIVE
+    session.commit()
+
+    html = client.get("/leden?status=actief", headers=BEHEERDER).text
+
+    assert "Gevonden leden: <strong>1</strong>" in html
+    assert "Totaal aantal leden: <strong>2</strong>" in client.get("/leden", headers=BEHEERDER).text
+    partial = client.get("/leden?q=inactief", headers=BEHEERDER | {"HX-Request": "true"}).text
+    assert 'hx-swap-oob="true">Gevonden leden: <strong>1</strong>' in partial
+
+
 def test_navigation_follows_role(client) -> None:
     html = client.get("/", headers={"X-Dev-Roles": "bestuurder"}).text
 
@@ -469,4 +483,8 @@ def test_donations_list_filters_on_member(client, session) -> None:
     html = client.get(f"/donaties?member_id={a.id}", headers=BEHEERDER).text
     assert 'data-member-search="member_id"' in html
     assert html.count('href="/leden/') == 1 and "€ 10,00" in html and "€ 20,00" not in html
+    assert "Gevonden donaties: <strong>1</strong>" in html
+    detail = client.get(f"/leden/{a.id}", headers=BEHEERDER).text
+    assert "Totaal aantal donaties: <strong>1</strong>" in detail and "meest recente" not in detail
+    assert "Totaal aantal donaties: <strong>2</strong>" in client.get("/donaties").text
     assert client.get("/donaties?member_id=x", headers=BEHEERDER).text.count("data-select-row") == 2

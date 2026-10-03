@@ -5,10 +5,11 @@
 <div class="page-head">
   <h1>Leden</h1>
   <div class="actions">
-    {% if principal.can(Permission.MEMBER_FIELDS_WRITE) %}<a role="button" class="secondary" href="/ledenvelden">Ledenvelden</a>{% endif %}
+    {% if principal.can(Permission.MEMBER_FIELDS_WRITE) %}<a role="button" href="/ledenvelden">Ledenvelden</a>{% endif %}
     {% if principal.can(Permission.MEMBERS_WRITE) %}<a role="button" href="/leden/nieuw">Nieuw lid</a>{% endif %}
   </div>
 </div>
+{% include "members/_info.html" %}
 
 <search aria-label="Leden zoeken">
 <form class="member-filter" action="/leden" method="get"

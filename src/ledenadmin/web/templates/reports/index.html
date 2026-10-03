@@ -37,7 +37,7 @@
   </div>
   <div class="filter-actions">
     <button type="submit">Toepassen</button>
-    <a role="button" class="secondary outline" href="/rapportage">Filters resetten</a>
+    <a role="button" href="/rapportage">Filters resetten</a>
   </div>
 </form>
 
@@ -49,7 +49,7 @@
 <section aria-labelledby="ai-kop">
   <h2 id="ai-kop">AI Analyse</h2>
   <p><small>Analyseert alleen totalen voor de actieve filters; namen en e-mailadressen worden niet gedeeld.</small></p>
-  <button type="button" class="secondary"
+  <button type="button"
           hx-post="/rapportage/ai" hx-include="#report-filter" hx-target="#inzicht" hx-disabled-elt="this">
     AI Analyse
   </button>

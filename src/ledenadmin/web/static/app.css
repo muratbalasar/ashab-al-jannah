@@ -72,6 +72,14 @@ header nav ul:last-child {
   background: var(--pico-card-background-color);
 }
 
+.info-bar {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-left: 4px solid var(--pico-primary);
+  background: var(--pico-card-background-color);
+}
+
 .error {
   color: var(--pico-del-color);
 }
@@ -581,6 +589,25 @@ tr.is-selected > * {
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator {
   display: inline;
+}
+
+/* Knopconventie: <button> voert een actie uit (gevulde knop); een link met role="button"
+   navigeert naar een andere pagina (omlijnde knop met pijl). */
+a[role="button"] {
+  --pico-background-color: transparent;
+  --pico-color: var(--pico-primary);
+  --pico-border-color: var(--pico-primary);
+}
+
+a[role="button"]:is(:hover, :focus-visible) {
+  --pico-background-color: color-mix(in srgb, var(--pico-primary) 10%, transparent);
+  --pico-color: var(--pico-primary-hover);
+  --pico-border-color: var(--pico-primary-hover);
+}
+
+a[role="button"]::after {
+  content: " ›";
+  font-weight: 700;
 }
 
 /* Grotere aanraakdoelen op touchscreens */

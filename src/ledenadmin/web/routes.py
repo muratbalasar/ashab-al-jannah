@@ -179,8 +179,9 @@ def members_list(
 ) -> Response:
     status_value = MemberStatus(status) if status in set(MemberStatus) else None
     members = services.members.search(q.strip() or None, status_value, limit=None)
-    context = {"members": members, "q": q, "status": status}
-    template = "members/_table.html" if is_partial(request) else "members/list.html"
+    partial = is_partial(request)
+    context = {"members": members, "q": q, "status": status, "partial": partial}
+    template = "members/_table.html" if partial else "members/list.html"
     return render(request, template, context)
 
 
@@ -247,12 +248,19 @@ def member_create(
 
 
 def _member_detail(request, services, principal, member, values, errors, status_code=200):
+    may_read = principal.can(Permission.DONATIONS_READ)
     donations = (
         [DonationRead.from_entity(d) for d in services.donations.recent(20, member.id)]
-        if principal.can(Permission.DONATIONS_READ)
+        if may_read
         else []
     )
-    context = {"member": member, "values": values, "errors": errors, "donations": donations}
+    context = {
+        "member": member,
+        "values": values,
+        "errors": errors,
+        "donations": donations,
+        "donation_total": services.donations.count(member.id) if may_read else 0,
+    }
     return render(request, "members/detail.html", context | _extra_fields(services), status_code)
 
 

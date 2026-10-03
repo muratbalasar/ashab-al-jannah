@@ -19,10 +19,11 @@
       <a role="button" href="/donaties/nieuw?member_id={{ member.id }}">Donatie registreren</a>
       {% endif %}
       {% if principal.can(Permission.REPORTS_MEMBER_READ) %}
-      <a role="button" class="secondary" href="/rapportage?member_id={{ member.id }}">Rapportage lid</a>
+      <a role="button" href="/rapportage?member_id={{ member.id }}">Rapportage lid</a>
       {% endif %}
     </div>
   </div>
+  <p class="info-bar">Totaal aantal donaties: <strong>{{ donation_total }}</strong>{% if donation_total > donations | length %} · de {{ donations | length }} meest recente worden getoond. <a href="/donaties?member_id={{ member.id }}">Alle donaties van dit lid</a>{% endif %}</p>
   {% with donations=donations, hide_member=True %}{% include "donations/_table.html" %}{% endwith %}
 </section>
 {% endif %}

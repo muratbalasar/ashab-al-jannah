@@ -1,4 +1,5 @@
 {% set selectable = principal and principal.can(Permission.MEMBERS_DELETE) %}
+{% if partial %}{% include "members/_info.html" %}{% endif %}
 {% if members %}
 <div class="overflow-auto">
   <table class="striped">

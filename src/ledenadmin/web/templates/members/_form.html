@@ -26,6 +26,7 @@
            {% if f.field_type == field_types.MOBILE %}type="tel" inputmode="tel" autocomplete="tel" placeholder="06 12345678"
            {% elif f.field_type == field_types.IBAN %}type="text" autocomplete="off" spellcheck="false" placeholder="NL91 ABNA 0417 1643 00" class="iban"
            {% elif f.field_type == field_types.NUMBER %}type="text" inputmode="decimal" autocomplete="off"
+           {% elif f.field_type == field_types.DATETIME %}type="text" inputmode="numeric" autocomplete="off" placeholder="dd-mm-jjjj uu:mm" pattern="\d{1,2}-\d{1,2}-\d{4}( \d{1,2}:\d{2})?"
            {% else %}type="text"{% endif %}
            {{ invalid(errors, fname) }} {% if readonly %}disabled{% endif %}>
     {{ field_error(errors, fname) }}
