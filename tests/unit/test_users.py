@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from ledenadmin.auth.principal import Identity
+from ledenadmin.config import AuthMode
 from ledenadmin.domain.enums import OrganizationStatus, Role
 from ledenadmin.domain.models import Membership, Organization, User
 from ledenadmin.main import create_app
@@ -173,3 +174,21 @@ def test_superadmin_without_membership_sees_no_member_data(superadmin_client, or
 )
 def test_static_files_are_not_caught_by_legacy_redirect(client, path) -> None:
     assert client.get(path, follow_redirects=False).status_code == 200
+
+
+def test_invite_button_hidden_in_local_mode(client, database) -> None:
+    from test_my import add_member
+
+    org = add_org(database, "stichting-l")
+    grant(database, "baas", org, Role.BEHEERDER)
+    member = add_member(database, org, "Lid L")
+    headers = {"X-Dev-User": "baas", "X-Dev-Roles": ""}
+    url = f"/o/stichting-l/leden/{member}"
+    assert "Uitnodigen voor Mijn omgeving" not in client.get(url, headers=headers).text
+    client.app.state.settings = client.app.state.settings.model_copy(
+        update={"auth_mode": AuthMode.EASYAUTH}
+    )
+    from ledenadmin.auth.providers import DevAuthProvider
+
+    client.app.state.auth_provider = DevAuthProvider("ontwikkelaar", "")
+    assert "Uitnodigen voor Mijn omgeving" in client.get(url, headers=headers).text

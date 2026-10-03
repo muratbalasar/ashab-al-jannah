@@ -12,6 +12,7 @@ from ledenadmin import audit
 from ledenadmin.api.deps import CurrentPrincipal, Services, get_session, require
 from ledenadmin.audit import Action
 from ledenadmin.auth.principal import Principal
+from ledenadmin.config import AuthMode
 from ledenadmin.domain.enums import MemberStatus, Permission
 from ledenadmin.domain.errors import ConflictError, DomainError
 from ledenadmin.schemas.categories import CategoryCreate
@@ -95,6 +96,8 @@ def render(
         "melding": melding,
         "org": org_prefix(request),
         "organization": getattr(request.state, "organization", None),
+        # Lokaal (dev-login) kan niemand anders inloggen; uitnodigen heeft dan geen zin.
+        "local_mode": request.app.state.settings.auth_mode == AuthMode.DEV,
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code
