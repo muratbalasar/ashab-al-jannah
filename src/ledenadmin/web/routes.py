@@ -188,6 +188,37 @@ def home(request: Request, principal: CurrentPrincipal) -> Response:
     return redirect(request, "/rapportage")
 
 
+# ── Help ─────────────────────────────────────────────────────────────────────
+
+# (anker, titel, vereiste permissie of None = iedereen); volgorde = volgorde op de pagina.
+HELP_SECTIONS = (
+    ("start", "Aan de slag", None),
+    ("lid", "Mijn omgeving en online doneren", Permission.SELF_READ),
+    ("leden", "Leden en extra velden", Permission.MEMBERS_READ),
+    ("donaties", "Donaties invoeren en importeren", Permission.DONATIONS_WRITE),
+    ("rapportage", "Rapportage en export", Permission.REPORTS_READ),
+    ("categorieen", "Categorieën", Permission.CATEGORIES_WRITE),
+    ("gebruikers", "Gebruikers uitnodigen", Permission.USERS_MANAGE),
+    ("instellingen", "Mollie, export en organisatie verwijderen", Permission.ORGANIZATION_MANAGE),
+)
+
+
+def help_sections(principal) -> list[tuple[str, str]]:
+    sections = [
+        (anchor, title)
+        for anchor, title, permission in HELP_SECTIONS
+        if permission is None or principal.can(permission)
+    ]
+    if principal.is_superadmin:
+        sections.append(("platform", "Platformbeheer (superadmin)"))
+    return sections
+
+
+@router.get("/help")
+def help_page(request: Request, principal: CurrentPrincipal) -> Response:
+    return render(request, "help/index.html", {"sections": help_sections(principal)})
+
+
 # ── Mijn omgeving (rol lid) ──────────────────────────────────────────────────
 
 

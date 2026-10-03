@@ -35,6 +35,7 @@
         {% if org and principal.can(Permission.USERS_MANAGE) %}<li><a href="{{ org }}/gebruikers">Gebruikers</a></li>{% endif %}
         {% if org and principal.can(Permission.ORGANIZATION_MANAGE) %}<li><a href="{{ org }}/instellingen">Instellingen</a></li>{% endif %}
         {% if principal.is_superadmin %}<li><a href="/platform">Platform</a></li>{% endif %}
+        {% if org %}<li><a href="{{ org }}/help">Help</a></li>{% endif %}
         <li><small title="Aangemeld als">{{ principal.name }}{% if organization %} · {{ organization.name }}{% endif %}</small></li>
       </ul>
       {% endif %}

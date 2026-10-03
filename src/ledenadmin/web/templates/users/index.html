@@ -2,7 +2,7 @@
 {% from "macros.html" import field_error, invalid, form_error, csrf %}
 {% block title %}Gebruikers – {{ app_name }}{% endblock %}
 {% block content %}
-<h1>Gebruikers</h1>
+<h1>Gebruikers <a href="{{ org }}/help#gebruikers" title="Help bij gebruikers" aria-label="Help bij gebruikers"><small>?</small></a></h1>
 {% if mail_enabled and mail_quota.exhausted %}
 <p class="info-bar">De daglimiet voor e-mail is bereikt. Deel de uitnodigingslink zelf.</p>
 {% elif mail_enabled and mail_quota.warning %}
