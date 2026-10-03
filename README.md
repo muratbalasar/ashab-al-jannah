@@ -91,8 +91,36 @@ Meerdere organisaties of rollen lokaal testen:
 
 ### Optie B – Container-image met Docker (Windows en Linux)
 
-Installeer eerst Docker: op Windows [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-(met WSL 2), op Linux [Docker Engine](https://docs.docker.com/engine/install/).
+#### Docker installeren
+
+**Windows 10/11**
+
+1. Zet WSL 2 aan (PowerShell als administrator), en herstart daarna de pc:
+
+   ```powershell
+   wsl --install
+   ```
+
+2. Installeer Docker Desktop:
+
+   ```powershell
+   winget install -e --id Docker.DockerDesktop
+   ```
+
+   Of download het via [docker.com](https://www.docker.com/products/docker-desktop/).
+3. Start **Docker Desktop** en wacht tot onderin "Engine running" staat.
+4. Controleer: `docker run --rm hello-world`.
+
+**Linux (Ubuntu/Debian)**
+
+```sh
+curl -fsSL https://get.docker.com | sudo sh   # officieel installatiescript
+sudo usermod -aG docker $USER                 # docker zonder sudo gebruiken
+newgrp docker                                  # of opnieuw inloggen
+docker run --rm hello-world                    # controle
+```
+
+Andere distributies: zie [Docker Engine installeren](https://docs.docker.com/engine/install/).
 
 #### B1 – Kant-en-klare image van GitHub (zonder clonen)
 
