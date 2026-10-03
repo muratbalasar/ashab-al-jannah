@@ -619,3 +619,23 @@ a[role="button"]::after {
     min-height: 3rem;
   }
 }
+
+/* Gebruikers: rollen als compacte chips met een kleine intrek-knop. */
+form.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0.4rem 0.3rem 0;
+  padding: 0.15rem 0.2rem 0.15rem 0.6rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+form.role-chip button {
+  width: auto;
+  margin: 0;
+  padding: 0 0.45rem;
+  line-height: 1.4;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
