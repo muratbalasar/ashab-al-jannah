@@ -19,6 +19,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.responses import Response
 
 from ledenadmin.domain.models import AuditLog
+from ledenadmin.tenancy import current_organization_id
 
 logger = logging.getLogger("ledenadmin.audit")
 
@@ -143,8 +144,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _save(request: Request, entries: list[AuditLog]) -> None:
+        organization_id = getattr(request.app.state, "organization_id", None)
         with request.app.state.database.session() as session:
             for entry in entries:
+                entry.organization_id = organization_id
                 logger.info(
                     "%s %s %s %s %s",
                     entry.user,
@@ -179,7 +182,13 @@ def purge(session: Session, now: datetime | None = None) -> int:
 def recent(
     session: Session, user: str = "", action: str = "", limit: int | None = None
 ) -> list[AuditLog]:
-    stmt = select(AuditLog).order_by(AuditLog.at.desc(), AuditLog.id.desc()).limit(limit)
+    """Logregels van de organisatie waaraan de sessie gebonden is."""
+    stmt = (
+        select(AuditLog)
+        .where(AuditLog.organization_id == current_organization_id(session))
+        .order_by(AuditLog.at.desc(), AuditLog.id.desc())
+        .limit(limit)
+    )
     if user:
         stmt = stmt.where(AuditLog.user.contains(user))
     if action:

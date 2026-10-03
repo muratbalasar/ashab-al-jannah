@@ -8,6 +8,7 @@ from ledenadmin.config import AuthMode, Settings
 from ledenadmin.db import Database
 from ledenadmin.main import create_app
 from ledenadmin.services.category_service import CategoryService
+from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.web.security import CSRF_COOKIE
 
 
@@ -31,8 +32,14 @@ def database(settings: Settings) -> Iterator[Database]:
 
 
 @pytest.fixture
-def session(database: Database) -> Iterator[Session]:
+def organization_id(database: Database) -> int:
     with database.session() as s:
+        return ensure_default_organization(s)
+
+
+@pytest.fixture
+def session(database: Database, organization_id: int) -> Iterator[Session]:
+    with database.session(organization_id) as s:
         CategoryService(s).ensure_defaults()
         yield s
 

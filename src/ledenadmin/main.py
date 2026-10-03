@@ -14,6 +14,7 @@ from ledenadmin.config import Settings, get_settings
 from ledenadmin.db import Database
 from ledenadmin.services.ai.insight_service import InsightService, build_insight_provider
 from ledenadmin.services.category_service import CategoryService
+from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.web import routes as web_routes
 from ledenadmin.web.security import SecurityMiddleware
 from ledenadmin.web.templating import STATIC_DIR, build_templates
@@ -28,8 +29,10 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        with database.session() as session:
+            app.state.organization_id = ensure_default_organization(session)
         if settings.seed_default_categories:
-            with database.session() as session:
+            with database.session(app.state.organization_id) as session:
                 if CategoryService(session).ensure_defaults():
                     logger.info("Standaardcategorieën aangemaakt")
         yield

@@ -16,7 +16,8 @@ def get_settings(request: Request) -> Settings:
 
 
 def get_session(request: Request) -> Iterator[Session]:
-    with request.app.state.database.session() as session:
+    # Fase 1: één organisatie per installatie; vanaf fase 2 bepaald door URL en lidmaatschap.
+    with request.app.state.database.session(request.app.state.organization_id) as session:
         yield session
 
 

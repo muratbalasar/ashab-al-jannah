@@ -15,6 +15,20 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ledenadmin.db import Base, UTCDateTime, utcnow
 from ledenadmin.domain.enums import MemberStatus
 from ledenadmin.domain.money import from_cents
+from ledenadmin.tenancy import TenantMixin
+
+
+class Organization(Base):
+    """Een stichting of vereniging; alle gegevens hangen onder precies één organisatie."""
+
+    __tablename__ = "organizations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(Unicode(80), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Unicode(200), nullable=False)
+    kvk_number: Mapped[str | None] = mapped_column(Unicode(8), nullable=True, unique=True)
+    status: Mapped[str] = mapped_column(Unicode(20), nullable=False, default="actief")
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 
 class TimestampMixin:
@@ -25,12 +39,13 @@ class TimestampMixin:
     created_by: Mapped[str] = mapped_column(Unicode(200), nullable=False, default="systeem")
 
 
-class Member(TimestampMixin, Base):
+class Member(TenantMixin, TimestampMixin, Base):
     __tablename__ = "members"
+    __table_args__ = (UniqueConstraint("organization_id", "email"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(Unicode(200), nullable=False, index=True)
-    email: Mapped[str] = mapped_column(Unicode(320), nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(Unicode(320), nullable=False)
     status: Mapped[MemberStatus] = mapped_column(
         Enum(
             MemberStatus,
@@ -49,11 +64,12 @@ class Member(TimestampMixin, Base):
         return self.status == MemberStatus.ACTIVE
 
 
-class Category(Base):
+class Category(TenantMixin, Base):
     __tablename__ = "categories"
+    __table_args__ = (UniqueConstraint("organization_id", "name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name: Mapped[str] = mapped_column(Unicode(100), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(Unicode(100), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     subcategories: Mapped[list["Subcategory"]] = relationship(
@@ -61,7 +77,7 @@ class Category(Base):
     )
 
 
-class Subcategory(Base):
+class Subcategory(TenantMixin, Base):
     __tablename__ = "subcategories"
     __table_args__ = (
         UniqueConstraint("category_id", "name", name="uq_subcategories_category_name"),
@@ -77,7 +93,7 @@ class Subcategory(Base):
     category: Mapped[Category] = relationship(back_populates="subcategories")
 
 
-class Donation(TimestampMixin, Base):
+class Donation(TenantMixin, TimestampMixin, Base):
     __tablename__ = "donations"
     __table_args__ = (CheckConstraint("amount_cents > 0", name="amount_positive"),)
 
@@ -104,18 +120,19 @@ class Donation(TimestampMixin, Base):
         return self.subcategory.category
 
 
-class MemberField(Base):
+class MemberField(TenantMixin, Base):
     """Door de beheerder gedefinieerd extra veld voor leden (bijv. telefoon of nieuwsbrief)."""
 
     __tablename__ = "member_fields"
+    __table_args__ = (UniqueConstraint("organization_id", "label"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    label: Mapped[str] = mapped_column(Unicode(100), nullable=False, unique=True)
+    label: Mapped[str] = mapped_column(Unicode(100), nullable=False)
     field_type: Mapped[str] = mapped_column(Unicode(20), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
-class MemberFieldValue(Base):
+class MemberFieldValue(TenantMixin, Base):
     __tablename__ = "member_field_values"
 
     member_id: Mapped[int] = mapped_column(
@@ -133,6 +150,10 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # Leeg bij verzoeken buiten een organisatie (bijv. platformbeheer).
+    organization_id: Mapped[int | None] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False, index=True)
     user: Mapped[str] = mapped_column(Unicode(200), nullable=False, index=True)
     action: Mapped[str] = mapped_column(Unicode(20), nullable=False, index=True)

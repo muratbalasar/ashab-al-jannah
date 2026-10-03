@@ -7,6 +7,8 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.types import TypeDecorator
 
+from ledenadmin.tenancy import bind
+
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -59,10 +61,17 @@ class Database:
                 kwargs["poolclass"] = StaticPool
             engine = create_engine(url, **kwargs)
 
+            in_memory = "poolclass" in kwargs
+
             @event.listens_for(engine, "connect")
-            def _enable_foreign_keys(dbapi_connection, _record) -> None:
+            def _configure_sqlite(dbapi_connection, _record) -> None:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA foreign_keys=ON")
+                # Wachten in plaats van direct "database is locked" bij gelijktijdig schrijven.
+                cursor.execute("PRAGMA busy_timeout=5000")
+                if not in_memory:
+                    # WAL: lezers en schrijver blokkeren elkaar niet; vereist voor Litestream.
+                    cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.close()
 
             return engine
@@ -76,8 +85,11 @@ class Database:
         return self._session_factory()
 
     @contextmanager
-    def session(self) -> Iterator[Session]:
+    def session(self, organization_id: int | None = None) -> Iterator[Session]:
+        """Sessie, optioneel gebonden aan een organisatie (zie `ledenadmin.tenancy`)."""
         session = self.new_session()
+        if organization_id is not None:
+            bind(session, organization_id)
         try:
             yield session
         except Exception:
