@@ -368,6 +368,26 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 | `MAIL_DAILY_LIMIT` | `300` | E-mails per dag (gratis Brevo-limiet); waarschuwing vanaf 80% |
 | `TIMEZONE` | `Europe/Amsterdam` | Weergave en periodegrenzen |
 | `AI_PROVIDER` | `local` | `local`, `openai` of `anthropic` |
+| `AI_MODEL` / `AI_TIMEOUT_SECONDS` | leeg / `20` | Model en time-out voor `openai`/`anthropic` |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `ANTHROPIC_API_KEY` | leeg | Sleutels/endpoint van de AI-provider |
+| `KVK_API_URL` | `https://api.kvk.nl/api/v2/zoeken` | Endpoint van de KVK Zoeken-API |
+| `SECRET_ENCRYPTION_KEY` | leeg | Fernet-sleutel voor de Mollie-sleutels van stichtingen; leeg = online doneren uit (zie *Online doneren*) |
+| `MOLLIE_API_URL` | `https://api.mollie.com/v2` | Mollie-API |
+| `ALLOW_DONATIONS_FOR_INACTIVE_MEMBERS` | `false` | Donaties toestaan voor inactieve leden |
+| `SEED_DEFAULT_CATEGORIES` | `true` | Standaardcategorieën aanmaken bij een nieuwe organisatie |
+| `ALLOW_SQLITE_IN_PRODUCTION` | `false` | SQLite toestaan bij `APP_ENV=production` |
+| `DEV_USER_NAME` / `DEV_USER_ROLES` | `ontwikkelaar` / leeg | Alleen bij `AUTH_MODE=dev` |
+
+### Checklist productie (alle fases)
+
+1. **Fase 1–2** – `APP_ENV=production`, `DATABASE_URL` (Azure SQL/PostgreSQL), `AUTH_MODE=easyauth`.
+2. **Fase 3** – `SUPERADMIN_SUBJECTS`, `SUPERADMIN_EMAIL`, `PUBLIC_BASE_URL` (publiek https-adres);
+   optioneel `KVK_API_KEY`, `BREVO_API_KEY` + `MAIL_SENDER_EMAIL` (geverifieerd afzenderdomein in Brevo).
+3. **Fase 4** – Entra External ID met Google/Microsoft/Apple/Facebook en Easy Auth: zie
+   [4-EntraExternalID.md](4-EntraExternalID.md); `EASYAUTH_LOGIN_URL`.
+4. **Fase 5–6** – geen extra instellingen (rol *lid*, export/verwijderen werken direct).
+5. **Fase 7** – `SECRET_ENCRYPTION_KEY` genereren en veilig bewaren; elke stichting koppelt zelf
+   Mollie in *Instellingen*.
 
 ## Tests en kwaliteit
 
