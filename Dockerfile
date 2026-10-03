@@ -9,6 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# OS-beveiligingsupdates bovenop de basis-image (Trivy blokkeert HIGH/CRITICAL met beschikbare fix)
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN if [ "$INSTALL_MSSQL_DRIVER" = "true" ]; then \
         apt-get update \
         && apt-get install -y --no-install-recommends curl ca-certificates libgssapi-krb5-2 \
