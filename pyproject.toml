@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "Ashab al-Jannah: ledenadministratie met donatieregistratie, rapportage en AI-inzichten"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { file = "LICENSE.md" }
 dependencies = [
     "fastapi>=0.142",
     "uvicorn[standard]>=0.54",

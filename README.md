@@ -448,3 +448,19 @@ gratis tegoeden.
 2. Bewaartermijnen, back-up/herstel (Azure SQL PITR) en AVG-procedures.
 3. Keuze en kostenlimiet voor een externe AI-provider, en of verwerking in de EU vereist is.
 4. Boekhoudpakket en bankformaat voor de integraties.
+
+## Licentie
+
+Ashab al-Jannah valt onder de [PolyForm Noncommercial License 1.0.0](./LICENSE.md).
+Kort samengevat (de Engelse licentietekst is bindend):
+
+- **Gratis** voor goede doelen en andere organisaties zonder winstoogmerk, zoals een
+  vakıf, dernek, stichting, vereniging, moskee, hafızlık-, Koran- of imam-hatipschool. Dat
+  geldt ook als de organisatie inkomsten heeft uit donaties, contributie of kleine
+  vergoedingen voor activiteiten (bijv. sadaka, zakat, waterputten, iftar, onderwijs).
+- **Gratis** voor persoonlijk gebruik, studie, onderzoek en hobbyprojecten.
+- Aanpassen en delen mag, mits de licentie en de copyrightregel (`Required Notice`)
+  meegaan.
+- **Niet toegestaan:** commercieel gebruik, zoals de software verkopen, als betaalde dienst
+  (SaaS) aanbieden of inzetten in een bedrijf met winstoogmerk. Neem voor commercieel
+  gebruik contact op via GitHub.
