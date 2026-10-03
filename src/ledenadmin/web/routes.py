@@ -301,7 +301,8 @@ def member_update(
     except DomainError as exc:
         return _member_detail(request, services, principal, member, values, domain_errors(exc), 409)
     services.member_fields.save(member_id, extra_values)
-    return RedirectResponse(f"/leden/{member_id}?melding=lid-bijgewerkt", status_code=303)
+    # int() garandeert een lokaal pad en geldt voor CodeQL als sanitizer (geen open redirect).
+    return RedirectResponse(f"/leden/{int(member_id)}?melding=lid-bijgewerkt", status_code=303)
 
 
 # ── Ledenvelden (beheerder) ─────────────────────────────────────────────────
@@ -505,7 +506,7 @@ def _categories_page(
 def _saved(request: Request, services: Services, category_id: int, message: str) -> Response:
     if is_partial(request):
         return _categories_page(request, services)
-    url = f"/categorieen?melding={message}#categorie-{category_id}"
+    url = f"/categorieen?{urlencode({'melding': message})}#categorie-{int(category_id)}"
     return RedirectResponse(url, status_code=303)
 
 
