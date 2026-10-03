@@ -354,3 +354,10 @@ Gevolgen:
   - Na 30 dagen wordt alles definitief gewist: lidmaatschappen, uitnodigingen, leden, donaties, categorieën, ledenvelden, logboek en de organisatie zelf. Dit gebeurt bij het starten van de app en bij het openen van `/platform`.
   - `/platform`: per organisatie KVK (met ✓ als gecontroleerd), plaats, aantal gebruikers en leden, laatste activiteit (uit het logboek) en status, plus totalen. Verwijderde organisaties kan de superadmin **herstellen** of **nu wissen**. Nog steeds geen persoonsgegevens.
   - Een verwijderde organisatie houdt haar KVK-nummer bezet tot ze gewist is, zodat herstellen mogelijk blijft.
+
+### Fase 7 ✅ gereed – Online doneren (Mollie, optie A)
+
+- Gekozen voor **optie A**: de stichting plakt haar eigen Mollie API-sleutel in Instellingen (geen Mollie Connect/OAuth, geen platformaccount). Sleutel wordt gecontroleerd bij Mollie en versleuteld (Fernet, `SECRET_ENCRYPTION_KEY`) opgeslagen.
+- Nieuwe permissie `self:donate` voor de rol *lid*; tabel `payments` (migratie 0008).
+- Flow: `/mijn` → `POST /mijn/doneren` → Mollie-checkout → `/mijn/betaling/{id}`; webhook `POST /betalingen/webhook/{slug}` (status altijd bij Mollie opgehaald, bedrag gecontroleerd, idempotent) boekt bij `paid` een donatie.
+- Verwijderen/wissen van een organisatie neemt betalingen mee.

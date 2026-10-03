@@ -26,6 +26,10 @@ class ServiceContainer:
         self.insights = insights
         self.csv_exporter: ReportExporter = CsvDonationExporter()
 
+    @property
+    def session(self) -> Session:
+        return self._session
+
     @cached_property
     def members(self) -> MemberService:
         return MemberService(self._session)

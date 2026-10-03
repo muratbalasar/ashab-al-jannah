@@ -19,7 +19,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
     ),
     Role.BESTUURDER: frozenset({Permission.REPORTS_READ, Permission.INSIGHTS_READ}),
     # Een lid ziet alleen eigen gegevens op /mijn.
-    Role.LID: frozenset({Permission.SELF_READ}),
+    Role.LID: frozenset({Permission.SELF_READ, Permission.SELF_DONATE}),
 }
 
 

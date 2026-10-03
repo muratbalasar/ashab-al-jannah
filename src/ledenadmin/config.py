@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     mail_sender_name: str = "Ashab al-Jannah"
     mail_daily_limit: int = Field(default=300, ge=1)
 
+    # Versleutelt de Mollie-sleutels van stichtingen in de database (Fernet-sleutel).
+    # Maak er een met: python -c "from cryptography.fernet import Fernet;
+    #   print(Fernet.generate_key().decode())"
+    secret_encryption_key: str | None = None
+    mollie_api_url: str = "https://api.mollie.com/v2"
+
     allow_donations_for_inactive_members: bool = False
     seed_default_categories: bool = True
     allow_sqlite_in_production: bool = False

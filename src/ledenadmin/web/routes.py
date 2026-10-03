@@ -40,6 +40,14 @@ MESSAGES = {
     "subcategorie-opgeslagen": "De subcategorie is opgeslagen.",
     "verwijderd": "Verwijderd.",
     "veld-opgeslagen": "Het veld is opgeslagen.",
+    "mollie-gekoppeld": "Mollie is gekoppeld. Leden kunnen nu online doneren.",
+    "mollie-ontkoppeld": "Mollie is ontkoppeld. Online doneren staat uit.",
+}
+
+DONATE_ERRORS = {
+    "amount": "Kies een bedrag tussen \u20ac 1 en \u20ac 10.000.",
+    "subcategory_id": "Kies een categorie.",
+    "algemeen": "Online doneren lukt op dit moment niet. Probeer het later opnieuw.",
 }
 
 CATEGORY_NAME_ERROR = "Vul een naam in (maximaal 100 tekens)."
@@ -199,6 +207,11 @@ def my_overview(
         ReportFilter(start_date=date(year, 1, 1), end_date=date(year, 12, 31), member_id=member.id)
     )
     context = {"member": member, "report": report, "year": year, "years": years}
+    if principal.can(Permission.SELF_DONATE) and request.app.state.secret_box.enabled:
+        organization = request.state.organization
+        if organization.mollie_api_key_encrypted:
+            context["donate_categories"] = [c for c in services.categories.list() if c.is_active]
+            context["donate_error"] = DONATE_ERRORS.get(request.query_params.get("fout", ""), None)
     return render(request, "my/index.html", context)
 
 

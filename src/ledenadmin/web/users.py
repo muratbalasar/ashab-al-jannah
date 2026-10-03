@@ -189,8 +189,9 @@ GRACE_DAYS = 30
 
 
 def _settings_page(request: Request, errors=None, status_code=200) -> Response:
-    context = {"errors": errors or {}, "grace_days": GRACE_DAYS}
-    return render(request, "organizations/settings.html", context, status_code)
+    from ledenadmin.web.payments import _settings
+
+    return _settings(request, errors, status_code)
 
 
 @org_router.get("/instellingen")

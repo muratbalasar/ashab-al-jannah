@@ -34,6 +34,8 @@ class Organization(Base):
     # Bewust geen foreign key (zie migratie 0006); alleen voor de aanmaaklimiet per gebruiker.
     created_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
     deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    # Versleuteld met SECRET_ENCRYPTION_KEY; nooit leesbaar in de database.
+    mollie_api_key_encrypted: Mapped[str | None] = mapped_column(Unicode(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
 
 
@@ -205,6 +207,30 @@ class AuditLog(Base):
     detail: Mapped[str | None] = mapped_column(Unicode(2000), nullable=True)
     ip: Mapped[str | None] = mapped_column(Unicode(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Unicode(300), nullable=True)
+
+
+class Payment(TenantMixin, TimestampMixin, Base):
+    """Online betaling via Mollie; wordt een donatie zodra Mollie 'paid' meldt."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mollie_id: Mapped[str | None] = mapped_column(Unicode(40), nullable=True, unique=True)
+    member_id: Mapped[int] = mapped_column(
+        ForeignKey("members.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    subcategory_id: Mapped[int] = mapped_column(
+        ForeignKey("subcategories.id", ondelete="RESTRICT"), nullable=False
+    )
+    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(Unicode(20), nullable=False, default="open")
+    donation_id: Mapped[int | None] = mapped_column(
+        ForeignKey("donations.id", ondelete="SET NULL"), nullable=True
+    )
+
+    @property
+    def amount(self) -> Decimal:
+        return from_cents(self.amount_cents)
 
 
 class Invitation(Base):

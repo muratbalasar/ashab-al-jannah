@@ -115,7 +115,7 @@ def test_role_permissions() -> None:
     assert not penningmeester.can(Permission.CATEGORIES_WRITE)
     assert not bestuurder.can(Permission.CATEGORIES_WRITE)
     lid = Principal("l", parse_roles(["lid"]))
-    assert lid.permissions == {Permission.SELF_READ}
+    assert lid.permissions == {Permission.SELF_READ, Permission.SELF_DONATE}
 
 
 def test_dev_auth_is_refused_in_production() -> None:

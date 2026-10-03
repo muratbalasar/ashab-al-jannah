@@ -23,6 +23,7 @@ from ledenadmin.domain.models import (
     MemberFieldValue,
     Membership,
     Organization,
+    Payment,
     Subcategory,
     User,
 )
@@ -32,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 DELETE_GRACE = timedelta(days=30)
 # Volgorde van wissen: eerst wat naar andere tabellen verwijst.
-TENANT_TABLES = (MemberFieldValue, Donation, MemberField, Subcategory, Category, Member)
+TENANT_TABLES = (Payment, MemberFieldValue, Donation, MemberField, Subcategory, Category, Member)
 
 
 def _iso(value: datetime | None) -> str:

@@ -473,3 +473,15 @@ Kort samengevat (de Engelse licentietekst is bindend):
 - **Niet toegestaan:** commercieel gebruik, zoals de software verkopen, als betaalde dienst
   (SaaS) aanbieden of inzetten in een bedrijf met winstoogmerk. Neem voor commercieel
   gebruik contact op via GitHub.
+
+## Online doneren (Mollie)
+
+Elke stichting koppelt haar eigen Mollie-account via **Instellingen → Online doneren**: Live API-sleutel (`live_...`) plakken. Het geld gaat rechtstreeks naar de stichting; het platform raakt geen geld aan.
+
+| Variabele | Betekenis |
+|---|---|
+| `SECRET_ENCRYPTION_KEY` | Fernet-sleutel waarmee API-sleutels versleuteld worden opgeslagen. Leeg = online doneren uit. |
+| `MOLLIE_API_URL` | Standaard `https://api.mollie.com/v2`. |
+| `PUBLIC_BASE_URL` | Moet publiek bereikbaar zijn (https) zodat Mollie de webhook `/betalingen/webhook/{slug}` kan aanroepen. Bij `localhost` wordt de status pas bijgewerkt als het lid terugkeert. |
+
+Leden (rol *lid*, gekoppeld aan een lidrecord) zien op *Mijn omgeving* een doneerformulier. Na betaling (`paid`) wordt automatisch een donatie geboekt.

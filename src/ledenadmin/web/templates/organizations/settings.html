@@ -11,6 +11,36 @@
 </article>
 
 <article>
+  <header><strong>Online doneren (Mollie)</strong></header>
+  {% if not mollie_available %}
+  <p>Online doneren is op dit platform nog niet ingeschakeld. Neem contact op met de platformbeheerder.</p>
+  {% elif mollie_mode %}
+  <p>Mollie is gekoppeld{% if mollie_mode == "test" %} in <strong>testmodus</strong> (er wordt geen echt geld afgeschreven){% endif %}. Leden kunnen doneren via <em>Mijn omgeving</em>.</p>
+  <form method="post" action="{{ org }}/instellingen/mollie/ontkoppelen" data-confirm="Mollie ontkoppelen? Leden kunnen dan niet meer online doneren.">
+    {{ csrf(csrf_token) }}
+    <button type="submit" class="secondary">Ontkoppelen</button>
+  </form>
+  {% else %}
+  <p>Laat leden online doneren met iDEAL. Het geld gaat rechtstreeks naar uw eigen Mollie-rekening; Mollie rekent per betaling een kleine vergoeding.</p>
+  <ol>
+    <li>Maak een account aan op <a href="https://www.mollie.com/nl" rel="noopener" target="_blank">mollie.com</a> en rond de verificatie af.</li>
+    <li>Zet in Mollie de betaalmethode iDEAL aan.</li>
+    <li>Kopieer in het Mollie-dashboard onder <em>Developers → API-sleutels</em> de <strong>Live API-sleutel</strong> (begint met <code>live_</code>) en plak die hieronder. Met een <code>test_</code>-sleutel kunt u eerst proberen.</li>
+  </ol>
+  {% endif %}
+  {% if mollie_available %}
+  <form method="post" action="{{ org }}/instellingen/mollie" data-once novalidate>
+    {{ csrf(csrf_token) }}
+    <label for="api_key">{% if mollie_mode %}Andere API-sleutel{% else %}Mollie API-sleutel{% endif %}
+      <input id="api_key" name="api_key" type="password" autocomplete="off" spellcheck="false" placeholder="live_..." required {{ invalid(errors, 'api_key') }}>
+      {{ field_error(errors, 'api_key') }}
+    </label>
+    <button type="submit">Koppelen</button>
+  </form>
+  {% endif %}
+</article>
+
+<article>
   <header><strong>Organisatie verwijderen</strong></header>
   <p>De organisatie is direct niet meer bereikbaar voor alle gebruikers. Na {{ grace_days }} dagen worden alle gegevens definitief gewist. Tot die tijd kan de platformbeheerder haar herstellen.</p>
   <p>Maak eerst een export als u de gegevens wilt bewaren.</p>

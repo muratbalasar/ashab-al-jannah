@@ -37,3 +37,4 @@ class Permission(StrEnum):
     SELF_READ = "self:read"
     USERS_MANAGE = "users:manage"
     ORGANIZATION_MANAGE = "organization:manage"
+    SELF_DONATE = "self:donate"
