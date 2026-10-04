@@ -272,26 +272,29 @@ Principes:
 
 ## Gebruikers en autorisatie
 
-| Recht | Beheerder | Penningmeester | Bestuurder |
-|---|:-:|:-:|:-:|
-| Leden inzien | ✔ | ✔ | |
-| Leden aanmaken/wijzigen | ✔ | | |
-| Donaties inzien | ✔ | ✔ | |
-| Donaties registreren | ✔ | ✔ | |
-| Donaties verwijderen | ✔ | | |
-| Leden verwijderen (inclusief hun donaties) | ✔ | | |
-| Categorieën en subcategorieën beheren | ✔ | | |
-| Rapportage (totalen, grafieken) | ✔ | ✔ | ✔ |
-| Rapportage per lid / met namen | ✔ | ✔ | |
-| AI-analyse | ✔ | ✔ | ✔ |
-| CSV-export | ✔ | ✔ | |
-| Logboek inzien | ✔ | | |
+| Recht | Beheerder | Penningmeester | Bestuurder | Lid |
+|---|:-:|:-:|:-:|:-:|
+| Leden inzien | ✔ | ✔ | | |
+| Leden aanmaken/wijzigen | ✔ | | | |
+| Donaties inzien | ✔ | ✔ | | |
+| Donaties registreren | ✔ | ✔ | | |
+| Donaties verwijderen | ✔ | | | |
+| Leden verwijderen (inclusief hun donaties) | ✔ | | | |
+| Categorieën en subcategorieën beheren | ✔ | | | |
+| Rapportage (totalen, grafieken) | ✔ | ✔ | ✔ | |
+| Rapportage per lid / met namen | ✔ | ✔ | | |
+| Eigen gegevens, jaaroverzicht en donaties | | | | ✔ |
+| AI-analyse | ✔ | ✔ | ✔ | |
+| CSV-export | ✔ | ✔ | | |
+| Logboek inzien | ✔ | | | |
 
 De beheerder heeft alle rechten, ook rechten die later worden toegevoegd. De rechten staan
 centraal in [principal.py](./src/ledenadmin/auth/principal.py) en worden
 server-side afgedwongen. De UI toont alleen toegestane acties. Een bestuurder krijgt
-rapporten zonder uitsplitsing per lid en zonder losse donaties. Deze verdeling is een
-startpunt dat met het bestuur moet worden bevestigd.
+rapporten zonder uitsplitsing per lid en zonder losse donaties. Een lid ziet alleen het eigen
+gekoppelde ledenrecord en jaaroverzicht op *Mijn omgeving*; het lid kan geen organisatiebrede
+rapportages of gegevens van andere leden inzien. Deze verdeling is een startpunt dat met het
+bestuur moet worden bevestigd.
 
 ### Ledenvelden
 
