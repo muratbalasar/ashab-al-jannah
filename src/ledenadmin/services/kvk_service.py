@@ -9,6 +9,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from ledenadmin.services.http import validate_https_url
+
 logger = logging.getLogger(__name__)
 
 KVK_PATTERN = re.compile(r"^\d{8}$")
@@ -48,17 +50,17 @@ class KvkApiLookup:
 
     def __init__(self, api_key: str, url: str) -> None:
         self._api_key = api_key
-        self._url = url
+        self._url = validate_https_url(url)
 
     def lookup(self, kvk_number: str) -> KvkResult:
         if not is_valid_format(kvk_number):
             return KvkResult(found=False)
-        request = Request(  # noqa: S310 - vaste https-URL uit de configuratie
+        request = Request(
             f"{self._url}?{urlencode({'kvkNummer': kvk_number})}",
             headers={"apikey": self._api_key, "Accept": "application/json"},
         )
         try:
-            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
                 data = json.loads(response.read())
         except HTTPError as exc:
             if exc.code == 404:

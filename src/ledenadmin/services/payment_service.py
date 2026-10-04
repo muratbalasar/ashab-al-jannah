@@ -21,6 +21,7 @@ from ledenadmin.db import utcnow
 from ledenadmin.domain.errors import BusinessRuleError, NotFoundError
 from ledenadmin.domain.models import Donation, Member, Organization, Payment, Subcategory
 from ledenadmin.domain.money import to_cents
+from ledenadmin.services.http import validate_https_url
 
 logger = logging.getLogger(__name__)
 
@@ -96,10 +97,10 @@ class MollieApi(Protocol):
 
 class HttpMollieApi:
     def __init__(self, base_url: str) -> None:
-        self._base = base_url.rstrip("/")
+        self._base = validate_https_url(base_url).rstrip("/")
 
     def _call(self, api_key: str, method: str, path: str, body: dict | None = None) -> dict:
-        request = Request(  # noqa: S310 - vaste https-URL uit de configuratie
+        request = Request(
             f"{self._base}{path}",
             data=json.dumps(body).encode() if body is not None else None,
             headers={
@@ -110,7 +111,7 @@ class HttpMollieApi:
             method=method,
         )
         try:
-            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
                 return json.loads(response.read())
         except HTTPError as exc:
             logger.warning("Mollie gaf status %s op %s %s", exc.code, method, path)

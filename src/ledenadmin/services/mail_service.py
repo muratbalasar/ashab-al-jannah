@@ -65,7 +65,7 @@ class BrevoTransport:
             method="POST",
         )
         try:
-            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # noqa: S310
+            with urlopen(request, timeout=TIMEOUT_SECONDS) as response:  # nosec B310
                 return 200 <= response.status < 300
         except (URLError, TimeoutError):
             logger.exception("Versturen via Brevo mislukt")
