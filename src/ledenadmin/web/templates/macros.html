@@ -14,6 +14,16 @@
   <input type="hidden" name="csrf_token" value="{{ token }}">
 {%- endmacro %}
 
+{#- Ronde helpknop naast een paginatitel; verwijst naar een onderdeel van de helppagina. -#}
+{% macro help_link(href, label) -%}
+<a href="{{ href }}" class="help-link" title="{{ label }}" aria-label="{{ label }}">
+  <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
+  </svg>
+</a>
+{%- endmacro %}
+
 {#- Ledenkeuzelijst met zoekveld. Het zoekveld filtert de opties in de browser (app.js) op
     naam, lidnummer en e-mail; zonder JavaScript blijft het zoekveld verborgen. -#}
 {% macro member_picker(name, label, members, selected, placeholder, errors={}, required=False) -%}

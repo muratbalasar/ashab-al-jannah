@@ -58,6 +58,9 @@ class Settings(BaseSettings):
 
     allow_donations_for_inactive_members: bool = False
     seed_default_categories: bool = True
+    # Back-up van de SQLite-database via Litestream (zie docker-entrypoint.sh en README).
+    litestream_replica_url: str | None = None
+    # Alleen voor productie zonder Litestream, bijv. met een eigen back-up van een vast volume.
     allow_sqlite_in_production: bool = False
 
     ai_provider: AIProviderName = AIProviderName.LOCAL
@@ -87,11 +90,12 @@ class Settings(BaseSettings):
         if (
             self.is_production
             and self.database_url.startswith("sqlite")
+            and not self.litestream_replica_url
             and not self.allow_sqlite_in_production
         ):
             raise ValueError(
-                "SQLite is in productie niet geschikt (geen persistente opslag in containers); "
-                "stel DATABASE_URL in op Azure SQL of zet ALLOW_SQLITE_IN_PRODUCTION=true"
+                "SQLite in productie vereist een back-up: zet LITESTREAM_REPLICA_URL (Litestream, "
+                "zie README) of, met een eigen back-up, ALLOW_SQLITE_IN_PRODUCTION=true"
             )
         if self.ai_provider != AIProviderName.LOCAL and not self.ai_model:
             raise ValueError("AI_MODEL is verplicht voor een externe AI-provider")

@@ -1,8 +1,9 @@
 # User stories en acceptatiecriteria
 
-Deze stories beschrijven het MVP-gedrag (US01–US08) en de geplande uitbreidingen
-(US09–US10). De scenario's staan in [`2-TestScenarios`](./2-TestScenarios); techniek en
-rollen staan in [`README.md`](./README.md).
+Deze stories beschrijven het MVP-gedrag (US01–US08), wat daarna is gebouwd (US11–US15) en
+de geplande uitbreidingen (US09–US10). De scenario's staan in
+[`2-TestScenarios`](./2-TestScenarios); techniek en rollen staan in [`README.md`](./README.md)
+en het ontwerp voor meerdere stichtingen in [`3-MultiTenantOntwerp.md`](./3-MultiTenantOntwerp.md).
 
 | Story | Status | Geautomatiseerde tests |
 |---|---|---|
@@ -14,6 +15,11 @@ rollen staan in [`README.md`](./README.md).
 | US08 Gegevens veilig beheren | Gebouwd | `06_autorisatie.robot`, `test_auth.py`, `test_api.py` |
 | US09 Boekhoudexport | CSV-export gebouwd; pakketkoppeling na MVP | `test_api.py` (CSV) |
 | US10 Bankafschrift | Na MVP | – |
+| US11 Stichting aanmelden | Gebouwd | `test_signup.py`, `test_tenancy.py`, `test_users.py` |
+| US12 Gebruikers uitnodigen | Gebouwd | `test_signup.py`, `test_users.py` |
+| US13 Mijn omgeving en online doneren | Gebouwd | `test_my.py`, `test_payments.py` |
+| US14 Donaties corrigeren | Gebouwd | `test_donation_edit.py` |
+| US15 Platformbeheer, export en verwijderen | Gebouwd | `test_organization_data.py`, `test_users.py` |
 
 ## US01 - Leden beheren
 
@@ -167,3 +173,69 @@ controle te verliezen.
 - AI mag matches voorstellen, maar boekt of koppelt nooit definitief zonder
   menselijke bevestiging.
 - Herhaalde import van hetzelfde bestand maakt geen dubbele transacties.
+
+## US11 - Stichting aanmelden
+
+Als bestuurslid wil ik onze stichting zelf aanmelden, zodat we zonder tussenkomst van de
+platformeigenaar kunnen beginnen.
+
+**Acceptatiecriteria**
+
+- Een ingelogde gebruiker meldt een stichting aan met naam, KVK-nummer (8 cijfers), plaats en
+  contact-e-mail en wordt daarvan de eerste beheerder.
+- Een KVK-nummer kan maar bij één stichting horen; een tweede aanmelding verwijst naar de
+  bestaande beheerder.
+- Eén gebruiker maakt maximaal één stichting per 24 uur aan, en maximaal 3 in totaal.
+- Gegevens van stichtingen zijn strikt gescheiden: een ID van een andere stichting geeft
+  altijd "niet gevonden".
+
+## US12 - Gebruikers uitnodigen
+
+Als beheerder wil ik penningmeesters, bestuurders en leden uitnodigen, zodat zij met hun eigen
+account kunnen inloggen.
+
+**Acceptatiecriteria**
+
+- Een uitnodiging heeft een e-mailadres en een rol, is 7 dagen geldig en één keer te gebruiken.
+- Accepteren kan alleen met een login op hetzelfde (geverifieerde) e-mailadres.
+- Ongeldige e-mailadressen (bijv. zonder punt in het domein) worden geweigerd.
+- Er blijft altijd minstens één beheerder over.
+- Zonder mailserver toont de app de link om zelf te delen; mailen kent een daglimiet.
+
+## US13 - Mijn omgeving en online doneren
+
+Als lid wil ik mijn eigen gegevens en donaties zien en online kunnen doneren, zodat ik zelf
+overzicht heb.
+
+**Acceptatiecriteria**
+
+- Een lid ziet alleen het eigen ledenrecord, de eigen donaties en een jaaroverzicht.
+- Een lid heeft geen toegang tot beheerpagina's van de stichting.
+- Online doneren kan alleen als de stichting Mollie heeft gekoppeld; een geslaagde betaling
+  wordt precies één keer als donatie geboekt.
+
+## US14 - Donaties corrigeren
+
+Als beheerder wil ik een verkeerd ingevoerde donatie kunnen corrigeren, zodat de administratie
+klopt zonder de donatie te verwijderen en opnieuw in te voeren.
+
+**Acceptatiecriteria**
+
+- Alleen de beheerder kan lid, categorie, bedrag, datum en omschrijving van een donatie wijzigen.
+- Elke wijziging wordt per veld vastgelegd met oude en nieuwe waarde, gebruiker en tijdstip, en
+  is zichtbaar bij de donatie.
+- Bij een online betaling liggen lid, bedrag en datum vast.
+- Bij een donatie uit een voorbij jaar waarschuwt de app dat eerdere overzichten niet meer
+  kloppen.
+
+## US15 - Platformbeheer, export en verwijderen
+
+Als platformeigenaar wil ik stichtingen kunnen overzien en blokkeren, en als beheerder wil ik
+alle gegevens van mijn stichting kunnen exporteren en verwijderen (AVG).
+
+**Acceptatiecriteria**
+
+- De superadmin ziet per stichting aantallen en status, maar geen ledengegevens.
+- Een geblokkeerde stichting is voor haar gebruikers niet bereikbaar.
+- De beheerder exporteert alle eigen gegevens als ZIP (JSON en CSV).
+- Verwijderen is eerst 30 dagen omkeerbaar; daarna worden alle gegevens gewist.

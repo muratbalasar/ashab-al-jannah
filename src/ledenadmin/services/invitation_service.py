@@ -1,6 +1,7 @@
 """Uitnodigingen en rolbeheer binnen één organisatie."""
 
 import hashlib
+import re
 import secrets
 from dataclasses import dataclass
 from datetime import timedelta
@@ -15,6 +16,11 @@ from ledenadmin.domain.models import Invitation, Member, Membership, Organizatio
 
 INVITATION_VALIDITY = timedelta(days=7)
 INVALID_LINK = "Deze uitnodiging is ongeldig, verlopen of al gebruikt."
+# Domein met minstens één punt (vangt typefouten als 'naam@gmailcom'). Bewust geen
+# email-validator: die weigert ook lokale testadressen zoals 'naam@dev.local'.
+EMAIL_PATTERN = re.compile(
+    r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}"
+)
 
 
 def hash_token(token: str) -> str:
@@ -46,7 +52,7 @@ class InvitationService:
         self, email: str, role: Role, actor: str, member_id: int | None = None
     ) -> CreatedInvitation:
         email = email.strip().lower()
-        if "@" not in email or len(email) > 320:
+        if len(email) > 320 or not EMAIL_PATTERN.fullmatch(email):
             raise BusinessRuleError("Vul een geldig e-mailadres in", field="email")
         if role == Role.LID:
             if member_id is None:

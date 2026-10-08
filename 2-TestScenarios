@@ -1,5 +1,6 @@
 # Gherkin-scenario's (Nederlandse stappen, Engelse sleutelwoorden).
-# Elk scenario is 1-op-1 geautomatiseerd in tests/functional (zelfde naam, zelfde stappen).
+# US01–US08: elk scenario is 1-op-1 geautomatiseerd in tests/functional (zelfde naam, zelfde stappen).
+# US11–US15: geautomatiseerd in tests/unit (pytest); bij elk scenario staat de testfunctie.
 
 Feature: Leden beheren (US01) – tests/functional/02_ledenbeheer.robot
 
@@ -112,6 +113,115 @@ Feature: Gegevens veilig beheren (US08) – tests/functional/06_autorisatie.robo
   Scenario: Wijzigingen via de web-UI vereisen een CSRF-token
     When een formulier zonder CSRF-token wordt verstuurd
     Then wordt de toegang geweigerd
+
+
+# ── Na de MVP gebouwd (geautomatiseerd met pytest in tests/unit) ─────────────────
+
+Feature: Stichting aanmelden (US11) – test_signup.py, test_tenancy.py
+
+  # test_signup_web_flow, test_create_organization_makes_creator_beheerder
+  Scenario: Gebruiker meldt een stichting aan
+    Given een ingelogde gebruiker zonder stichting
+    When de gebruiker een stichting aanmeldt met naam, KVK-nummer, plaats en e-mail
+    Then bestaat de stichting met een slug uit de naam
+    And is de gebruiker daar beheerder
+
+  # test_duplicate_kvk_points_to_existing_beheerder
+  Scenario: KVK-nummer is al in gebruik
+    Given er bestaat een stichting met KVK-nummer "12345678"
+    When een andere gebruiker een stichting met hetzelfde KVK-nummer aanmeldt
+    Then wordt de aanmelding geweigerd met de verwijzing naar de bestaande beheerder
+
+  # test_web_and_api_never_show_other_organization
+  Scenario: Gegevens van een andere stichting blijven onzichtbaar
+    Given twee stichtingen met elk eigen leden en donaties
+    When een beheerder van de eerste stichting een ID van de tweede opvraagt
+    Then krijgt hij "niet gevonden"
+
+
+Feature: Gebruikers uitnodigen (US12) – test_signup.py, test_users.py
+
+  # test_invite_and_accept_via_web
+  Scenario: Penningmeester accepteert een uitnodiging
+    Given de beheerder nodigt "penning@voorbeeld.nl" uit als penningmeester
+    When de penningmeester de link opent en accepteert met hetzelfde e-mailadres
+    Then kan de penningmeester donaties van de stichting registreren
+    But geen gebruikers beheren
+
+  # test_invitation_requires_matching_email
+  Scenario: Uitnodiging met een ander e-mailadres wordt geweigerd
+    Given een uitnodiging voor "a@voorbeeld.nl"
+    When iemand die is ingelogd als "b@voorbeeld.nl" de uitnodiging accepteert
+    Then wordt de uitnodiging geweigerd
+
+  # test_invitation_requires_valid_email
+  Scenario: Ongeldig e-mailadres bij uitnodigen
+    When de beheerder een uitnodiging maakt voor "naam@gmailcom"
+    Then wordt de uitnodiging geweigerd met "Vul een geldig e-mailadres in"
+
+
+Feature: Mijn omgeving en online doneren (US13) – test_my.py, test_payments.py
+
+  # test_lid_sees_only_own_data
+  Scenario: Lid ziet alleen eigen gegevens
+    Given een lid met eigen donaties en een ander lid met donaties
+    When het lid "Mijn omgeving" opent
+    Then ziet het lid alleen de eigen donaties en het eigen jaaroverzicht
+
+  # test_full_payment_flow_is_idempotent
+  Scenario: Online donatie wordt één keer geboekt
+    Given de stichting heeft Mollie gekoppeld
+    When het lid online doneert en Mollie de betaling twee keer als betaald meldt
+    Then is er precies één donatie geboekt
+
+
+Feature: Donaties corrigeren (US14) – test_donation_edit.py
+
+  # test_update_records_old_and_new_values, test_edit_via_web_redirects_back_and_shows_history
+  Scenario: Beheerder corrigeert het bedrag
+    Given een donatie van 50,00 euro
+    When de beheerder het bedrag wijzigt in 7,50 euro
+    Then is de donatie 7,50 euro
+    And toont de wijzigingsgeschiedenis "Bedrag" van "€ 50,00" naar "€ 7,50" met gebruiker en tijdstip
+
+  # test_edit_link_and_page_only_for_beheerder
+  Scenario: Penningmeester kan donaties niet bewerken
+    When de penningmeester een donatie probeert te bewerken
+    Then wordt de toegang geweigerd
+
+  # test_online_payment_locks_member_amount_and_date
+  Scenario: Online betaling ligt vast
+    Given een donatie uit een online betaling
+    When de beheerder het bedrag probeert te wijzigen
+    Then wordt de wijziging geweigerd
+    But kan de beheerder de omschrijving wel wijzigen
+
+  # test_past_year_warns_and_names_year
+  Scenario: Donatie uit een voorbij jaar
+    Given een donatie van vorig jaar
+    When de beheerder de donatie opent en wijzigt
+    Then waarschuwt de app dat de cijfers over dat jaar veranderen
+
+
+Feature: Platformbeheer, export en verwijderen (US15) – test_organization_data.py, test_users.py
+
+  # test_superadmin_without_membership_sees_no_member_data
+  Scenario: Superadmin ziet geen ledengegevens
+    When de superadmin de ledenlijst van een stichting opvraagt zonder daar lid te zijn
+    Then krijgt hij "niet gevonden"
+
+  # test_blocked_organization_is_not_reachable
+  Scenario: Geblokkeerde stichting is onbereikbaar
+    Given de superadmin heeft een stichting geblokkeerd
+    When de beheerder van die stichting inlogt
+    Then krijgt hij "niet gevonden"
+
+  # test_soft_delete_hides_organization_and_can_be_restored, test_purge_removes_everything_after_grace_period
+  Scenario: Verwijderen is 30 dagen omkeerbaar
+    Given de beheerder heeft de stichting verwijderd
+    Then is de stichting niet meer bereikbaar
+    And kan de superadmin haar binnen 30 dagen herstellen
+    And worden na 30 dagen alle gegevens gewist
 
 
 # ── Na de MVP (nog niet geautomatiseerd) ──────────────────────────────────────

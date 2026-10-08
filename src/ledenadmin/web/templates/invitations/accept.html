@@ -3,13 +3,18 @@
 {% block title %}Uitnodiging – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Uitnodiging</h1>
+{% set dev_switch %}{% if local_mode %}
+<p class="info-bar">Lokaal (ontwikkelmodus): <a href="/dev/gebruiker?terug={{ request.url.path | urlencode }}">wissel van gebruiker</a>{% if email %} en meld u aan als {{ email }}{% endif %}.</p>
+{% endif %}{% endset %}
 {% if error %}
 <p role="alert" class="error">{{ error }}</p>
+{{ dev_switch }}
 <p><a href="/">Naar de startpagina</a></p>
 {% else %}
 <p>U bent uitgenodigd als <strong>{{ role_label | lower }}</strong> van <strong>{{ organization_name }}</strong>.</p>
 {% if identity_email and identity_email | lower != email %}
 <p class="info-bar">Let op: de uitnodiging is voor <strong>{{ email }}</strong>, maar u bent aangemeld als {{ identity_email }}.</p>
+{{ dev_switch }}
 {% endif %}
 <form method="post" action="/uitnodiging/{{ token }}" data-once>
   {{ csrf(csrf_token) }}

@@ -10,7 +10,7 @@
   {% include "members/_form.html" %}
 {% endwith %}
 
-{% if principal.can(Permission.USERS_MANAGE) and not local_mode %}
+{% if principal.can(Permission.USERS_MANAGE) %}
 <form method="post" action="{{ org }}/leden/{{ member.id }}/uitnodigen" data-once>
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <button type="submit" class="secondary">Uitnodigen voor Mijn omgeving</button>

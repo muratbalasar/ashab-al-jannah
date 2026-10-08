@@ -60,6 +60,7 @@ def test_export_contains_only_own_data(client, database, org) -> None:
         "export.json",
         "leden.csv",
         "donaties.csv",
+        "donatiewijzigingen.csv",
         "categorieen.csv",
         "ledenvelden.csv",
         "gebruikers.csv",

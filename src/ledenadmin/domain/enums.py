@@ -26,6 +26,8 @@ class Permission(StrEnum):
     MEMBERS_DELETE = "members:delete"
     DONATIONS_READ = "donations:read"
     DONATIONS_WRITE = "donations:write"
+    # Bestaande donaties corrigeren; elke wijziging wordt met oude en nieuwe waarde vastgelegd.
+    DONATIONS_EDIT = "donations:edit"
     DONATIONS_DELETE = "donations:delete"
     CATEGORIES_WRITE = "categories:write"
     REPORTS_READ = "reports:read"

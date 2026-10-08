@@ -2,6 +2,7 @@ import base64
 import binascii
 import json
 import logging
+import re
 from typing import Protocol
 
 from starlette.requests import Request
@@ -17,6 +18,8 @@ DEV_USER_HEADER = "x-dev-user"
 DEV_ROLES_HEADER = "x-dev-roles"
 EASYAUTH_IDP_HEADER = "x-ms-client-principal-idp"
 DEV_ISSUER = "dev"
+DEV_USER_COOKIE = "dev_user"
+DEV_USER_PATTERN = re.compile(r"[A-Za-z0-9._+-]{1,100}(@[A-Za-z0-9.-]{1,200})?")
 # Entra zet het object-id in 'oid' of de lange claimnaam; andere providers gebruiken 'sub'.
 SUBJECT_CLAIMS = (
     "http://schemas.microsoft.com/identity/claims/objectidentifier",
@@ -88,7 +91,13 @@ class EasyAuthProvider:
 
 
 class DevAuthProvider:
-    """Alleen voor lokale ontwikkeling en tests; geweigerd als APP_ENV=production."""
+    """Alleen voor lokale ontwikkeling en tests; geweigerd als APP_ENV=production.
+
+    De gebruiker komt uit de header X-Dev-User, anders uit het cookie dat /dev/gebruiker zet,
+    anders uit DEV_USER_NAME. Een naam met @ is meteen het e-mailadres, zodat u lokaal een
+    uitnodiging voor een echt e-mailadres kunt accepteren. Een gebruiker uit het cookie
+    krijgt geen rollen uit DEV_USER_ROLES: die gedraagt zich als een nieuwe externe gebruiker.
+    """
 
     login_url = None
 
@@ -97,10 +106,25 @@ class DevAuthProvider:
         self._roles = parse_roles(roles.split(","))
 
     def authenticate(self, request: Request) -> Identity | None:
-        name = request.headers.get(DEV_USER_HEADER) or self._user_name
+        cookie_user = clean_dev_user(request.cookies.get(DEV_USER_COOKIE, ""))
+        name = request.headers.get(DEV_USER_HEADER) or cookie_user or self._user_name
         roles_header = request.headers.get(DEV_ROLES_HEADER)
-        roles = parse_roles(roles_header.split(",")) if roles_header is not None else self._roles
+        if roles_header is not None:
+            roles = parse_roles(roles_header.split(","))
+        elif cookie_user and not request.headers.get(DEV_USER_HEADER):
+            roles = frozenset()
+        else:
+            roles = self._roles
+        if "@" in name:
+            name = name.lower()
+            return Identity(DEV_ISSUER, name, name, name, roles)
         return Identity(DEV_ISSUER, name, name, f"{name}@dev.local", roles)
+
+
+def clean_dev_user(value: str) -> str | None:
+    """Gebruikersnaam of e-mailadres voor de dev-login; None als het geen geldige waarde is."""
+    value = (value or "").strip()
+    return value if DEV_USER_PATTERN.fullmatch(value) else None
 
 
 def build_auth_provider(settings: Settings) -> AuthProvider:

@@ -25,7 +25,6 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = ["openai>=3.24", "anthropic>=1.11"]
-azure-sql = ["pyodbc>=5.3"]
 dev = [
     "pytest>=9.1",
     "pytest-cov>=7.1",

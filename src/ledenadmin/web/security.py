@@ -51,6 +51,13 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def safe_return_path(value: str, default: str = "/") -> str:
+    """Alleen paden binnen deze site, zodat een terug-link geen open redirect wordt."""
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
+        return value
+    return default
+
+
 async def verify_csrf(request: Request) -> None:
     """Double-submit-controle voor formulieren en HTMX-verzoeken van de web-UI."""
     if request.method not in UNSAFE_METHODS:

@@ -87,7 +87,7 @@ jobs:
       - name: Kwetsbaarheden scannen
         run: >
           pip-audit --progress-spinner off
-          -r requirements.txt -r requirements-ai.txt -r requirements-azure-sql.txt
+          -r requirements.txt -r requirements-ai.txt
 
   # ────────────────────────────────────────────────────────────────
   # Job 3 – Functionele acceptatietests (Robot Framework tegen draaiende API)
@@ -177,7 +177,6 @@ jobs:
         run: |
           docker run -d --name ledenadmin -p 8000:8000 \
             -e APP_ENV=development -e AUTH_MODE=dev \
-            -e DATABASE_URL=sqlite:////tmp/ledenadmin.db \
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
           for i in $(seq 1 30); do
             curl -sf http://127.0.0.1:8000/api/v1/health && exit 0 || sleep 1
@@ -185,8 +184,41 @@ jobs:
           docker logs ledenadmin
           exit 1
 
-      - name: ODBC-driver aanwezig in image
-        run: docker exec ledenadmin python -c "import pyodbc; assert any('18' in d for d in pyodbc.drivers()), pyodbc.drivers()"
+      # Back-up en herstel met Litestream: schrijf een lid weg, gooi de container en zijn
+      # database weg en start een nieuwe container die de database uit de back-up terugzet.
+      # Lokale map als replica (file://) in plaats van Azure Blob Storage.
+      - name: Litestream back-up en herstel
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/replica && chmod 777 /tmp/replica
+          start() {
+            # AUTH_MODE=dev is in productie verboden; daarom APP_ENV=development.
+            docker run -d --name "$1" -p 8001:8000 \
+              -e APP_ENV=development -e AUTH_MODE=dev \
+              -e LITESTREAM_REPLICA_URL=file:///replica -v /tmp/replica:/replica \
+              ${{ env.IMAGE_NAME }}:${{ github.sha }} >/dev/null
+            for i in $(seq 1 30); do
+              curl -sf http://127.0.0.1:8001/api/v1/health >/dev/null && return 0 || sleep 1
+            done
+            docker logs "$1"; return 1
+          }
+          start backup-1
+          curl -sf -X POST http://127.0.0.1:8001/o/standaard/api/v1/members \
+            -H "X-Dev-Roles: beheerder" -H "Content-Type: application/json" \
+            -d '{"name": "Back-up Test", "email": "backup@voorbeeld.nl"}'
+          docker stop backup-1 >/dev/null   # SIGTERM: Litestream synchroniseert nog één keer
+          docker rm backup-1 >/dev/null
+          start backup-2
+          curl -sf http://127.0.0.1:8001/o/standaard/api/v1/members -H "X-Dev-Roles: beheerder" \
+            | grep -q "backup@voorbeeld.nl"
+          docker rm -f backup-2 >/dev/null
+          echo "Database teruggezet uit de back-up."
+
+      - name: Productie met SQLite zonder back-up weigert te starten
+        run: |
+          if timeout 60 docker run --rm -e APP_ENV=production ${{ env.IMAGE_NAME }}:${{ github.sha }}; then
+            echo "De container had moeten weigeren te starten zonder LITESTREAM_REPLICA_URL"; exit 1
+          fi
 
       - name: Image scannen op kwetsbaarheden (Trivy)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -288,7 +320,9 @@ jobs:
   # Vereiste GitHub Secrets (environment "production"):
   #   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID – OIDC federated credential
   #   GHCR_PULL_TOKEN  – PAT (classic) met alleen read:packages, zodat Azure de image kan pullen
-  #   DATABASE_URL     – Azure SQL-verbinding (zie README)
+  # Vereiste variabele (Settings → Variables, environment "production"):
+  #   LITESTREAM_REPLICA_URL – back-up van de SQLite-database, abs://<opslagaccount>@<container>/<pad>
+  #   (de managed identity van de app heeft "Storage Blob Data Contributor"; zie README)
   # Optioneel: AI_PROVIDER, AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, ANTHROPIC_API_KEY
   # Easy Auth (Entra ID) wordt eenmalig ingesteld; zie README "Deployment naar Azure".
   # ────────────────────────────────────────────────────────────────
@@ -323,7 +357,7 @@ jobs:
         env:
           IMAGE: ${{ needs.docker-push.outputs.image }}:${{ github.sha }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          LITESTREAM_REPLICA_URL: ${{ vars.LITESTREAM_REPLICA_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           AI_PROVIDER: ${{ vars.AI_PROVIDER || 'local' }}
@@ -331,9 +365,10 @@ jobs:
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
         run: |
           set -euo pipefail
-          ENV_VARS=(APP_ENV=production AUTH_MODE=easyauth DATABASE_URL=secretref:database-url
-                    AI_PROVIDER="$AI_PROVIDER")
-          SECRETS=(database-url="$DATABASE_URL")
+          : "${LITESTREAM_REPLICA_URL:?Zet de variabele LITESTREAM_REPLICA_URL (zie README, Deployment)}"
+          ENV_VARS=(APP_ENV=production AUTH_MODE=easyauth
+                    LITESTREAM_REPLICA_URL="$LITESTREAM_REPLICA_URL" AI_PROVIDER="$AI_PROVIDER")
+          SECRETS=()
           if [ -n "$AI_MODEL" ]; then ENV_VARS+=(AI_MODEL="$AI_MODEL"); fi
           if [ -n "$OPENAI_BASE_URL" ]; then ENV_VARS+=(OPENAI_BASE_URL="$OPENAI_BASE_URL"); fi
           if [ -n "$OPENAI_API_KEY" ]; then
@@ -345,18 +380,39 @@ jobs:
             ENV_VARS+=(ANTHROPIC_API_KEY=secretref:anthropic-api-key)
           fi
 
+          # SQLite met Litestream: altijd precies één container (twee schrijvers = corrupte data).
           if az containerapp show -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" >/dev/null 2>&1; then
+            # Een oude installatie met Azure SQL eerst overzetten; anders start de app leeg.
+            OLD_DB=$(az containerapp show -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+              --query "length(properties.template.containers[0].env[?name=='DATABASE_URL'])" -o tsv)
+            if [ "$OLD_DB" != "0" ]; then
+              echo "::error::De app gebruikt nog DATABASE_URL (Azure SQL). Zet eerst de gegevens over; zie README, 'Overstap van Azure SQL'."
+              exit 1
+            fi
             az containerapp registry set -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
               --server ghcr.io --username "${{ github.repository_owner }}" --password "$GHCR_PULL_TOKEN"
-            az containerapp secret set -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" --secrets "${SECRETS[@]}"
+            if [ ${#SECRETS[@]} -gt 0 ]; then
+              az containerapp secret set -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" --secrets "${SECRETS[@]}"
+            fi
+            # Geen overlap tussen oude en nieuwe container: eerst de oude stoppen (Litestream
+            # synchroniseert bij het stoppen nog één keer), dan pas de nieuwe starten. Kost een
+            # paar seconden onbereikbaarheid.
+            for REV in $(az containerapp revision list -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
+                           --query "[?properties.active].name" -o tsv); do
+              az containerapp revision deactivate -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" --revision "$REV"
+            done
+            sleep 20
             az containerapp update -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
-              --image "$IMAGE" --set-env-vars "${ENV_VARS[@]}"
+              --image "$IMAGE" --set-env-vars "${ENV_VARS[@]}" \
+              --min-replicas 0 --max-replicas 1
           else
+            SECRET_ARGS=()
+            if [ ${#SECRETS[@]} -gt 0 ]; then SECRET_ARGS=(--secrets "${SECRETS[@]}"); fi
             az containerapp create -n "$AZ_CONTAINER_APP" -g "$AZ_RESOURCE_GROUP" \
               --environment "$AZ_CONTAINER_APP_ENV" --image "$IMAGE" \
               --registry-server ghcr.io --registry-username "${{ github.repository_owner }}" \
               --registry-password "$GHCR_PULL_TOKEN" \
-              --secrets "${SECRETS[@]}" --env-vars "${ENV_VARS[@]}" \
+              "${SECRET_ARGS[@]}" --env-vars "${ENV_VARS[@]}" \
               --target-port 8000 --ingress external \
               --cpu 0.5 --memory 1Gi --min-replicas 0 --max-replicas 1 \
               --system-assigned \
@@ -371,7 +427,7 @@ jobs:
           echo "## Live URL: https://${FQDN}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Rooktest op Azure
-        # Ruime wachttijd: scale-to-zero en het hervatten van Azure SQL (free offer) kosten tijd.
+        # Ruime wachttijd: bij scale-to-zero start de container en zet Litestream eerst de database terug.
         run: |
           pip install -r requirements-dev.txt --quiet
           robot --include smoke --outputdir output/robot-results-azure \

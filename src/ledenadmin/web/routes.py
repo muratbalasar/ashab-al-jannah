@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping
 from datetime import date, datetime
 from typing import Annotated, Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import RedirectResponse
@@ -16,7 +16,7 @@ from ledenadmin.config import AuthMode
 from ledenadmin.domain.enums import MemberStatus, Permission
 from ledenadmin.domain.errors import ConflictError, DomainError
 from ledenadmin.schemas.categories import CategoryCreate
-from ledenadmin.schemas.donations import DonationCreate, DonationRead
+from ledenadmin.schemas.donations import DonationCreate, DonationRead, DonationUpdate
 from ledenadmin.schemas.members import MemberCreate, MemberUpdate
 from ledenadmin.schemas.reports import Report, ReportFilter
 from ledenadmin.services.member_field_service import (
@@ -25,7 +25,7 @@ from ledenadmin.services.member_field_service import (
     is_sensitive_label,
 )
 from ledenadmin.web.dates import nl_date_to_iso, nl_datetime_to_iso
-from ledenadmin.web.security import verify_csrf
+from ledenadmin.web.security import safe_return_path, verify_csrf
 
 router = APIRouter(dependencies=[Depends(verify_csrf)], include_in_schema=False)
 
@@ -35,6 +35,12 @@ MESSAGES = {
     "lid-verwijderd": "Het lid is verwijderd, samen met {donaties} donatie(s).",
     "leden-verwijderd": "{aantal} leden zijn verwijderd, samen met {donaties} donatie(s).",
     "donatie-geregistreerd": "De donatie is geregistreerd.",
+    "donatie-bijgewerkt": "De donatie is bijgewerkt.",
+    "donatie-bijgewerkt-jaar": (
+        "De donatie is bijgewerkt. Let op: dit wijzigt de cijfers over {jaar}; eerder "
+        "verstuurde rapporten en jaaroverzichten kloppen daardoor niet meer."
+    ),
+    "donatie-ongewijzigd": "Er is niets gewijzigd aan de donatie.",
     "donatie-verwijderd": "De donatie is verwijderd.",
     "donaties-verwijderd": "{aantal} donaties zijn verwijderd.",
     "categorie-opgeslagen": "De categorie is opgeslagen.",
@@ -85,9 +91,8 @@ def render(
 ) -> Response:
     melding = MESSAGES.get(request.query_params.get("melding", ""))
     if melding and "{" in melding:
-        numbers = {k: request.query_params.get(k, "") for k in ("aantal", "donaties")}
         try:
-            melding = melding.format(**{k: int(v) for k, v in numbers.items() if v.isdigit()})
+            melding = melding.format(**_message_args(request))
         except KeyError:
             melding = None
     base = {
@@ -96,12 +101,24 @@ def render(
         "melding": melding,
         "org": org_prefix(request),
         "organization": getattr(request.state, "organization", None),
-        # Lokaal (dev-login) kan niemand anders inloggen; uitnodigen heeft dan geen zin.
+        # Lokaal (dev-login): DEV-badge en de link om van gebruiker te wisselen.
         "local_mode": request.app.state.settings.auth_mode == AuthMode.DEV,
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code
     )
+
+
+def _message_args(request: Request) -> dict[str, Any]:
+    """Alleen getallen uit de URL in meldingen, zodat er geen vrije tekst in komt."""
+    params = request.query_params
+    args: dict[str, Any] = {
+        k: int(v) for k in ("aantal", "donaties") if (v := params.get(k, "")).isdigit()
+    }
+    years = [y for y in params.get("jaren", "").split(",") if y.isdigit() and len(y) == 4]
+    if years:
+        args["jaar"] = " en ".join(years)
+    return args
 
 
 def org_prefix(request: Request) -> str:
@@ -219,7 +236,10 @@ def help_sections(principal) -> list[tuple[str, str]]:
 
 @router.get("/help")
 def help_page(request: Request, principal: CurrentPrincipal) -> Response:
-    return render(request, "help/index.html", {"sections": help_sections(principal)})
+    sections = help_sections(principal)
+    if request.app.state.settings.auth_mode == AuthMode.DEV:
+        sections.append(("lokaal", "Lokaal testen (ontwikkelmodus)"))
+    return render(request, "help/index.html", {"sections": sections})
 
 
 # ── Mijn omgeving (rol lid) ──────────────────────────────────────────────────
@@ -509,12 +529,26 @@ def donations_list(
     return render(request, "donations/list.html", context)
 
 
+def _category_options(services, keep_subcategory_id: int | None = None) -> list[tuple[str, list]]:
+    """Keuzelijst per categorie: actieve subcategorieën, plus de huidige bij bewerken."""
+    options = []
+    for category in services.categories.list(include_inactive=keep_subcategory_id is not None):
+        subs = [
+            (s.id, f"{category.name} – {s.name}")
+            for s in category.subcategories
+            if (s.is_active and category.is_active) or s.id == keep_subcategory_id
+        ]
+        if subs:
+            options.append((category.name, subs))
+    return options
+
+
 def _donation_form(request, services, values, errors, status_code=200) -> Response:
     context = {
         "values": values,
         "errors": errors,
         "members": services.members.search(status=MemberStatus.ACTIVE, limit=MEMBER_PICKER_LIMIT),
-        "categories": services.categories.list(),
+        "category_options": _category_options(services),
     }
     return render(request, "donations/new.html", context, status_code)
 
@@ -573,6 +607,122 @@ def donations_delete(
     count = services.donations.delete_many(ids or [])
     melding = "donatie-verwijderd" if count == 1 else "donaties-verwijderd"
     return redirect(request, f"/donaties?melding={melding}&aantal={count}")
+
+
+CanEditDonations = _perm(Permission.DONATIONS_EDIT)
+MESSAGE_PARAMS = ("melding", "aantal", "donaties", "jaren")
+
+
+def _edit_values(request: Request, donation) -> dict[str, str]:
+    local = donation.donated_at.astimezone(request.app.state.settings.tz)
+    return {
+        "member_id": str(donation.member_id),
+        "subcategory_id": str(donation.subcategory_id),
+        "amount": f"{donation.amount:.2f}".replace(".", ","),
+        "donated_at": local.strftime("%Y-%m-%dT%H:%M"),
+        "description": donation.description or "",
+    }
+
+
+def _back_url(request: Request, terug: str, **params: Any) -> str:
+    """Terug naar de pagina binnen deze organisatie waar het bewerken begon, met een melding."""
+    default = f"{org_prefix(request)}/donaties"
+    target = safe_return_path(terug, default)
+    if not target.startswith(org_prefix(request) + "/"):
+        target = default
+    parts = urlsplit(target)
+    query = [(k, v) for k, v in parse_qsl(parts.query) if k not in MESSAGE_PARAMS]
+    query += [(k, str(v)) for k, v in params.items()]
+    return urlunsplit(("", "", parts.path, urlencode(query), ""))
+
+
+def _donation_edit_form(
+    request: Request,
+    services: Services,
+    donation_id: int,
+    values: dict[str, str],
+    errors: dict[str, str],
+    terug: str,
+    status_code: int = 200,
+) -> Response:
+    donation = services.donations.get(donation_id)
+    members = services.members.search(status=MemberStatus.ACTIVE, limit=MEMBER_PICKER_LIMIT)
+    if all(m.id != donation.member_id for m in members):
+        members = [donation.member, *members]
+    year = donation.donated_at.astimezone(request.app.state.settings.tz).year
+    context = {
+        "donation": DonationRead.from_entity(donation),
+        "values": values,
+        "errors": errors,
+        "members": members,
+        "category_options": _category_options(services, donation.subcategory_id),
+        "online": services.donations.is_online_payment(donation_id),
+        "past_year": year if year < today(request).year else None,
+        "changes": services.donations.changes(donation_id),
+        "terug": _back_url(request, terug),
+    }
+    return render(request, "donations/edit.html", context, status_code)
+
+
+@router.get("/donaties/{donation_id:int}/bewerken")
+def donation_edit(
+    request: Request,
+    donation_id: int,
+    services: Services,
+    _: CanEditDonations,
+    terug: str = "",
+) -> Response:
+    values = _edit_values(request, services.donations.get(donation_id))
+    return _donation_edit_form(request, services, donation_id, values, {}, terug)
+
+
+@router.post("/donaties/{donation_id:int}/bewerken")
+def donation_update(
+    request: Request,
+    donation_id: int,
+    services: Services,
+    principal: CanEditDonations,
+    member_id: FormText = "",
+    subcategory_id: FormText = "",
+    amount: FormText = "",
+    donated_at: FormText = "",
+    description: FormText = "",
+    terug: FormText = "",
+) -> Response:
+    values = {
+        "member_id": member_id,
+        "subcategory_id": subcategory_id,
+        "amount": amount,
+        "donated_at": donated_at,
+        "description": description,
+    }
+    if services.donations.is_online_payment(donation_id):
+        # Deze velden staan uit in het formulier; ze komen van de betaling.
+        current = _edit_values(request, services.donations.get(donation_id))
+        values |= {k: current[k] for k in ("member_id", "amount", "donated_at")}
+    data = clean(values)
+    if "amount" in data:
+        data["amount"] = parse_amount(data["amount"])
+    if "donated_at" in data:
+        data["donated_at"] = nl_datetime_to_iso(data["donated_at"])
+    try:
+        result = services.donations.update(
+            donation_id, DonationUpdate.model_validate(data), principal.name
+        )
+    except ValidationError as exc:
+        errors = form_errors(exc)
+        return _donation_edit_form(request, services, donation_id, values, errors, terug, 422)
+    except DomainError as exc:
+        errors = domain_errors(exc)
+        return _donation_edit_form(request, services, donation_id, values, errors, terug, 422)
+    if not result.changes:
+        return RedirectResponse(_back_url(request, terug, melding="donatie-ongewijzigd"), 303)
+    past = sorted(y for y in result.years if y < today(request).year)
+    if past:
+        params = {"melding": "donatie-bijgewerkt-jaar", "jaren": ",".join(map(str, past))}
+    else:
+        params = {"melding": "donatie-bijgewerkt"}
+    return RedirectResponse(_back_url(request, terug, **params), status_code=303)
 
 
 # ── Categorieën ──────────────────────────────────────────────────────────────

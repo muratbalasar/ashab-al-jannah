@@ -31,3 +31,14 @@ def test_help_per_role(client, database) -> None:
         assert f'id="{anchor}"' in baas
     assert 'id="platform"' not in baas
     assert 'href="/o/stichting-h/help"' in baas
+    assert 'id="lokaal"' in baas and "SUPERADMIN_SUBJECTS" in baas
+
+
+def test_local_testing_help_only_in_dev_mode(client) -> None:
+    from ledenadmin.config import AuthMode
+
+    assert 'id="lokaal"' in client.get("/o/standaard/help").text
+    client.app.state.settings = client.app.state.settings.model_copy(
+        update={"auth_mode": AuthMode.EASYAUTH}
+    )
+    assert 'id="lokaal"' not in client.get("/o/standaard/help").text

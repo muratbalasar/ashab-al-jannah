@@ -19,6 +19,7 @@ from ledenadmin.services.mail_service import build_mail_transport
 from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.services.payment_service import HttpMollieApi, SecretBox
+from ledenadmin.web import dev as web_dev
 from ledenadmin.web import payments as web_payments
 from ledenadmin.web import platform as web_platform
 from ledenadmin.web import routes as web_routes
@@ -86,5 +87,6 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.include_router(org)
     app.include_router(web_users.public_router)
     app.include_router(web_payments.webhook_router)
+    app.include_router(web_dev.router)
     app.include_router(web_platform.router)
     return app

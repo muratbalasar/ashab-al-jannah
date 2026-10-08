@@ -51,7 +51,7 @@
             <span class="session-user">{{ principal.name }}</span>
             {% if organization %}<span class="session-org"><span class="k">org</span>/{{ organization.slug }}</span>{% endif %}
           </span>
-          {% if local_mode %}<span class="env-badge" title="Lokale ontwikkelmodus">dev</span>{% endif %}
+          {% if local_mode %}<a href="/dev/gebruiker?terug={{ path | urlencode }}" class="env-badge" title="Lokale ontwikkelmodus: klik om van gebruiker te wisselen">dev</a>{% endif %}
         </li>
       </ul>
       {% endif %}

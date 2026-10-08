@@ -164,6 +164,22 @@ class Donation(TenantMixin, TimestampMixin, Base):
         return self.subcategory.category
 
 
+class DonationChange(TenantMixin, Base):
+    """Eén gewijzigd veld van een donatie: wie, wanneer, oude en nieuwe waarde (leesbaar)."""
+
+    __tablename__ = "donation_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    donation_id: Mapped[int] = mapped_column(
+        ForeignKey("donations.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    changed_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow, nullable=False)
+    changed_by: Mapped[str] = mapped_column(Unicode(200), nullable=False)
+    field: Mapped[str] = mapped_column(Unicode(40), nullable=False)
+    old_value: Mapped[str] = mapped_column(Unicode(600), nullable=False)
+    new_value: Mapped[str] = mapped_column(Unicode(600), nullable=False)
+
+
 class MemberField(TenantMixin, Base):
     """Door de beheerder gedefinieerd extra veld voor leden (bijv. telefoon of nieuwsbrief)."""
 

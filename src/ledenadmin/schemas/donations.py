@@ -19,6 +19,12 @@ class DonationCreate(BaseModel):
     description: Description | None = None
 
 
+class DonationUpdate(DonationCreate):
+    """Correctie van een bestaande donatie; alle velden worden opnieuw opgegeven."""
+
+    donated_at: datetime
+
+
 class DonationRead(BaseModel):
     id: int
     member_id: int

@@ -101,6 +101,18 @@ def test_dev_provider_defaults_and_header_override() -> None:
     assert provider.authenticate(request_with({"X-Dev-Roles": ""})).claimed_roles == frozenset()
 
 
+def test_dev_provider_uses_switch_cookie_and_email_as_user() -> None:
+    provider = DevAuthProvider("dev", "beheerder")
+    cookie = {"Cookie": "dev_user=Martin@Example.nl"}
+
+    switched = provider.authenticate(request_with(cookie))
+    assert switched == Identity(
+        "dev", "martin@example.nl", "martin@example.nl", "martin@example.nl"
+    )
+    assert provider.authenticate(request_with({**cookie, "X-Dev-User": "b"})).subject == "b"
+    assert provider.authenticate(request_with({"Cookie": "dev_user=<x>"})).subject == "dev"
+
+
 def test_role_permissions() -> None:
     bestuurder = Principal("b", parse_roles(["bestuurder"]))
     penningmeester = Principal("p", parse_roles(["penningmeester"]))
@@ -123,9 +135,11 @@ def test_dev_auth_is_refused_in_production() -> None:
         Settings(_env_file=None, app_env="production", auth_mode=AuthMode.DEV)
 
 
-def test_sqlite_is_refused_in_production_unless_explicitly_allowed() -> None:
-    with pytest.raises(ValidationError, match="SQLite"):
+def test_sqlite_in_production_requires_a_backup() -> None:
+    with pytest.raises(ValidationError, match="LITESTREAM_REPLICA_URL"):
         Settings(_env_file=None, app_env="production")
+    replica = "abs://opslag@ledenadmin/db"
+    assert Settings(_env_file=None, app_env="production", litestream_replica_url=replica)
     assert Settings(_env_file=None, app_env="production", allow_sqlite_in_production=True)
 
 

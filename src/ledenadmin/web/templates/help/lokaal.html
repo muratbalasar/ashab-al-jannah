@@ -1,0 +1,34 @@
+<p>Dit onderdeel ziet u alleen in de ontwikkelmodus (<code>AUTH_MODE=dev</code>). Inloggen is
+  dan uitgeschakeld: u bent <strong>{{ principal.name }}</strong>{% if principal.is_superadmin %}
+  en superadmin{% endif %}.</p>
+
+<h3>Van gebruiker wisselen</h3>
+<ul>
+  <li>Klik op de <strong>DEV</strong>-badge rechtsboven of ga naar <a href="/dev/gebruiker?terug={{ request.url.path | urlencode }}">Gebruiker wisselen</a> en vul een naam of e-mailadres in.</li>
+  <li>Een uitnodiging accepteert u door te wisselen naar <strong>het e-mailadres van de uitnodiging</strong>; de uitnodigingspagina linkt er ook naar.</li>
+  <li>Een gewisselde gebruiker krijgt geen vaste rollen, alleen die uit uitnodigingen of uit een eigen organisatie. Met <strong>Terug naar …</strong> bent u weer de standaardgebruiker.</li>
+  <li>De keuze geldt per browser. Gebruik een privévenster om twee gebruikers naast elkaar te testen.</li>
+</ul>
+
+<h3>Meerdere organisaties</h3>
+<ol>
+  <li>Wissel naar een nieuwe gebruiker, bijv. <code>beheerder-a</code>. Eén gebruiker mag één organisatie per 24 uur aanmaken.</li>
+  <li>Ga naar <a href="/aanmelden">Nieuwe stichting aanmaken</a> en vul een eigen KVK-nummer van 8 cijfers in (<code>11111111</code>, <code>22222222</code>, …). Lokaal wordt alleen het formaat gecontroleerd.</li>
+  <li>Voeg eventueel leden en donaties toe, en herhaal met <code>beheerder-b</code>, enzovoort.</li>
+  <li>Nodig een gebruiker uit in een tweede organisatie: op de <a href="/">startpagina</a> kiest hij dan tussen beide, en de gegevens blijven gescheiden.</li>
+</ol>
+
+<h3>Platformbeheer (superadmin)</h3>
+{% if principal.is_superadmin %}
+<p>U bent superadmin: zie <a href="/platform">Platform</a> en het onderdeel <a href="#platform">Platformbeheer</a>.</p>
+{% else %}
+<p>U bent geen superadmin. Stop de server en start hem opnieuw met:</p>
+<pre><code>$env:SUPERADMIN_SUBJECTS = "dev|ontwikkelaar"
+.\start.ps1</code></pre>
+{% endif %}
+<ul>
+  <li><strong>Blokkeren</strong>: blokkeer op <a href="/platform">Platform</a> een organisatie en wissel naar haar beheerder: de organisatie geeft dan &lsquo;niet gevonden&rsquo;.</li>
+  <li><strong>Verwijderen en herstellen</strong>: als beheerder via <em>Instellingen</em> → <em>Organisatie verwijderen</em> (typ de slug). Op Platform kunt u haar daarna herstellen of direct wissen.</li>
+  <li><strong>Privacy</strong>: als superadmin zonder rol in een organisatie ziet u haar leden en donaties niet.</li>
+</ul>
+<p><small>Uitgebreidere uitleg en <code>.\demo.ps1</code> (geautomatiseerde rondleiding): zie <code>README.md</code>, &lsquo;Lokaal en multi-tenant&rsquo;.</small></p>

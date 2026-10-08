@@ -194,6 +194,14 @@ def invite(database, org: int, email: str, role: Role = Role.PENNINGMEESTER, mem
         )
 
 
+@pytest.mark.parametrize(
+    "email", ["martin@gmailcom", "geen-apenstaart", "a@b", "a b@c.nl", "a@@b.nl", "a@-b.nl"]
+)
+def test_invitation_requires_valid_email(database, org_id, email) -> None:
+    with pytest.raises(BusinessRuleError, match="geldig e-mailadres"):
+        invite(database, org_id, email)
+
+
 def test_accept_invitation_grants_role(database, org_id) -> None:
     token = invite(database, org_id, "Penning@Dev.Local")
     with database.session() as session:

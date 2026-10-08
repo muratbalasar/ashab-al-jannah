@@ -1,6 +1,7 @@
 ﻿# Technisch ontwerp: multi-tenant en self-service
 
-Status: **concept, ter bespreking**. Open beslissingen staan in [§ 11](#11-open-beslissingen).
+Status: **fases 1–7 gebouwd** (zie [§ 12.1](#121-stand-van-zaken)). De besluiten staan in
+[§ 11](#11-besluiten-3-oktober-2026); wat nog niet is gebouwd staat in [§ 13](#13-nog-niet-gebouwd).
 
 ## 1. Doel en uitgangspunten
 
@@ -24,14 +25,17 @@ Azure Container Apps (Easy Auth valideert token) ──> app (FastAPI)
                     │                                   │
                     │                    Membership-tabel: gebruiker × stichting × rol
                     ▼                                   ▼
-               Azure SQL (gratis aanbod), één database, kolom organization_id
+        SQLite-bestand in de container, kolom organization_id
+                    │  Litestream (continu, ± 1 s)
+                    ▼
+        Azure Blob Storage (back-up; teruggezet bij het opstarten)
 ```
 
 | Onderdeel | Keuze | Kosten |
 |---|---|---|
 | Inloggen | Microsoft Entra External ID (externe tenant) | Gratis tot 50.000 actieve gebruikers per maand |
-| Hosting | Azure Container Apps, schaalt naar 0 | Gratis maandtegoed (180.000 vCPU-seconden, 2 mln. verzoeken) |
-| Database | Azure SQL Database, gratis aanbod, met automatisch pauzeren | Gratis tot 100.000 vCore-seconden per maand, 32 GB opslag |
+| Hosting | Azure Container Apps, schaalt naar 0, precies één container | Gratis maandtegoed (180.000 vCPU-seconden, 2 mln. verzoeken) |
+| Database | SQLite met Litestream naar Azure Blob Storage (§ 11 #5) | Een paar cent per maand voor de opslag |
 | Image | ghcr.io (publieke repo) | Gratis |
 | E-mail (uitnodigingen) | Zie § 7.3 | Gratis tot een bepaald volume |
 | KVK-controle | Zie § 6 | **Niet gratis** |
@@ -93,10 +97,10 @@ Het grootste risico is dat stichting A gegevens van stichting B ziet. Daarom gel
 4. **Tests:** een vaste testset maakt twee stichtingen aan en controleert voor elke route en
    API-endpoint dat A niets van B kan lezen, wijzigen of verwijderen. Een gok-ID van B geeft
    een 404, geen 403, zodat er niets uitlekt over het bestaan ervan.
-5. **Optioneel later:** Row-Level Security in Azure SQL als tweede slot.
+5. **Optioneel later:** Row-Level Security als tweede slot, bij een overstap naar PostgreSQL.
 
-Aparte databases per stichting vallen af: het gratis SQL-aanbod geldt voor maximaal 10
-databases en het beheer wordt zwaarder.
+Aparte databases per stichting vallen af: het beheer wordt zwaarder (migraties en back-ups
+per database).
 
 ## 5. Inloggen, rollen en de superadmin
 
@@ -247,14 +251,12 @@ Voor uitnodigingen is een maildienst nodig. Opties:
 | Onderdeel | Grens | Wat als het op is |
 |---|---|---|
 | Container Apps | 180.000 vCPU-seconden per maand (≈ 50 uur bij 1 vCPU, bij 0,25 vCPU ≈ 200 uur) | Betalen per gebruik, kleine bedragen |
-| Azure SQL (gratis aanbod) | 100.000 vCore-seconden per maand (≈ 28 uur rekentijd), 32 GB | Database pauzeert tot de volgende maand, **of** doorbetalen (instelbaar) |
+| Blob Storage (back-up) | Geen gratis tegoed; enkele MB's tot GB's | Een paar cent per maand |
 | Entra External ID | 50.000 actieve gebruikers per maand | $ 0,03 per extra gebruiker |
 
-**Belangrijkste risico:** de rekentijd van de gratis SQL-database. Met tientallen actieve
-stichtingen raakt die vermoedelijk binnen de maand op, en dan pauzeert de database voor
-iedereen. Zet de database daarom op **doorbetalen bij overschrijding** in plaats van
-pauzeren, en stel een budgetwaarschuwing in. Als alternatief kan PostgreSQL op de
-Container Apps-omgeving draaien, maar dat kost meer beheer.
+Sinds besluit 5 (§ 11) is er geen rekentijdgrens van een database meer: SQLite draait in de
+container zelf. Het belangrijkste kostenrisico is nu de rekentijd van Container Apps bij
+`minReplicas=1`; stel een budgetwaarschuwing in.
 
 ## 11. Besluiten (3 oktober 2026)
 
@@ -264,8 +266,8 @@ Container Apps-omgeving draaien, maar dat kost meer beheer.
 | 2 | Nieuwe stichting | Direct actief, **zonder limieten**. De superadmin krijgt een melding (e-mail en het overzicht in `/platform`). § 6.4 vervalt, op de aanmaaklimiet per gebruiker na. |
 | 3 | E-mail | **Brevo** (gratis tot 300 mails per dag) én altijd de mogelijkheid om de link te kopiëren en zelf te delen. De app telt de mails per dag. Bij 80% verschijnt een waarschuwing in een infobalk. Bij 300 mails blokkeert de app het versturen tot de volgende dag, met een melding dat de link handmatig gedeeld moet worden. |
 | 4 | Rol lid | Alleen via een uitnodiging van de beheerder; leden kunnen zichzelf niet koppelen. |
-| 5 | Database | **SQLite-bestand** op het volume van de container, met **Litestream** dat continu een back-up naar Azure Blob Storage maakt (een paar cent per maand). Bij het opstarten zet Litestream de database terug. Daarom draait er maximaal **1 replica** (`maxReplicas=1`). Hetzelfde model als lokaal, dus geen verschil tussen ontwikkeling en productie. Azure SQL vervalt; de rekentijdgrens uit § 10 speelt daarmee niet meer. Kies `minReplicas=0`, met een paar seconden opstarttijd, of `minReplicas=1`, dat meer van het gratis tegoed gebruikt. |
-| 6 | URL | `/o/{slug}/...`, bijvoorbeeld `/o/stichting-al-fajr/leden`. Het KVK-nummer werkt ook als verwijzing: `/o/12345678/leden` leidt door naar de slug. De slug is te wijzigen; oude slugs blijven doorverwijzen. |
+| 5 | Database | **SQLite-bestand** op de lokale schijf van de container, met **Litestream** dat continu een back-up naar Azure Blob Storage maakt (een paar cent per maand). Bij het opstarten zet Litestream de database terug. Daarom draait er maximaal **1 replica** (`maxReplicas=1`). Hetzelfde model als lokaal, dus geen verschil tussen ontwikkeling en productie. Azure SQL vervalt; de rekentijdgrens uit § 10 speelt daarmee niet meer. Kies `minReplicas=0`, met een paar seconden opstarttijd, of `minReplicas=1`, dat meer van het gratis tegoed gebruikt. ✅ Gebouwd, zie § 12.1. |
+| 6 | URL | `/o/{slug}/...`, bijvoorbeeld `/o/stichting-al-fajr/leden`. Het KVK-nummer werkt ook als verwijzing: `/o/12345678/leden` leidt door naar de slug. De slug is te wijzigen; oude slugs blijven doorverwijzen (nog niet gebouwd, zie § 13). |
 
 Gevolgen:
 - Het KVK-nummer wordt **verplicht en uniek** voor `Organization`.
@@ -320,7 +322,7 @@ Gevolgen:
 | 4 | Entra External ID instellen (Google, Microsoft, Apple, Facebook, e-mailcode) | Iedereen kan inloggen |
 | 5 | Rol lid en `/mijn`-omgeving | Leden zien hun eigen gegevens |
 | 6 | Export en verwijderen per stichting, platformoverzicht | AVG-compleet |
-| 7 | Zelf doneren via Mollie Connect | Online donaties |
+| 7 | Zelf doneren via Mollie (eigen sleutel per stichting) | Online donaties |
 
 ### 12.1 Stand van zaken
 
@@ -349,7 +351,7 @@ Gevolgen:
   - Leden hebben geen toegang tot ledenlijst, donaties, rapportage, API of gebruikersbeheer (403).
 - **Fase 6 ✅ gereed.**
   - `/o/{org}/instellingen` (recht `organization:manage`, alleen beheerder):
-    - **Exporteren:** ZIP met `export.json` en CSV's (leden met extra velden, donaties, categorieën, ledenvelden, gebruikers met rol). Alleen gegevens van de eigen organisatie.
+    - **Exporteren:** ZIP met `export.json` en CSV's (leden met extra velden, donaties, wijzigingen van donaties, categorieën, ledenvelden, gebruikers met rol). Alleen gegevens van de eigen organisatie.
     - **Verwijderen:** bevestigen door de slug te typen. Status wordt `verwijderd` en `deleted_at` wordt gezet (migratie `0007`); de organisatie geeft daarna 404.
   - Na 30 dagen wordt alles definitief gewist: lidmaatschappen, uitnodigingen, leden, donaties, categorieën, ledenvelden, logboek en de organisatie zelf. Dit gebeurt bij het starten van de app en bij het openen van `/platform`.
   - `/platform`: per organisatie KVK (met ✓ als gecontroleerd), plaats, aantal gebruikers en leden, laatste activiteit (uit het logboek) en status, plus totalen. Verwijderde organisaties kan de superadmin **herstellen** of **nu wissen**. Nog steeds geen persoonsgegevens.
@@ -361,3 +363,34 @@ Gevolgen:
 - Nieuwe permissie `self:donate` voor de rol *lid*; tabel `payments` (migratie 0008).
 - Flow: `/mijn` → `POST /mijn/doneren` → Mollie-checkout → `/mijn/betaling/{id}`; webhook `POST /betalingen/webhook/{slug}` (status altijd bij Mollie opgehaald, bedrag gecontroleerd, idempotent) boekt bij `paid` een donatie.
 - Verwijderen/wissen van een organisatie neemt betalingen mee.
+
+### Na fase 7
+
+- **Database: SQLite met Litestream ✅** (besluit 5).
+  - De image bevat Litestream (versie en checksum vast in de `Dockerfile`); de ODBC-driver voor Azure SQL is verwijderd. De database staat in de container op `/data/ledenadmin.db`.
+  - `docker-entrypoint.sh`: met `LITESTREAM_REPLICA_URL` eerst `litestream restore` (alleen als er nog geen database is), daarna `litestream replicate -exec` met migraties en de app als subproces. Lukt het terugzetten niet, dan start de container niet.
+  - Back-up naar Azure Blob Storage met de managed identity van de app (rol *Storage Blob Data Contributor*); dagelijkse snapshot, `LITESTREAM_RETENTION` standaard 7 dagen.
+  - De app weigert in productie SQLite zonder `LITESTREAM_REPLICA_URL` (of expliciet `ALLOW_SQLITE_IN_PRODUCTION=true`).
+  - De CI test terugzetten na het weggooien van een container. Bij een uitrol stopt de workflow eerst de oude container, zodat er nooit twee schrijvers zijn.
+  - Overstap van een bestaande Azure SQL-database: `python -m ledenadmin.copy_database` (README, *Overstap van Azure SQL*).
+- **Donaties bewerken ✅** (alleen beheerder, recht `donations:edit`): elk gewijzigd veld met oude en nieuwe waarde in `donation_changes` (migratie `0009`), ook in de export. Bij online betalingen liggen lid, bedrag en datum vast; bij een voorbij jaar waarschuwt de app.
+- **Lokaal testen ✅**: in de ontwikkelmodus kan elke browser van gebruiker wisselen via `/dev/gebruiker` (bijv. om een uitnodiging te accepteren); uitleg onder Help → *Lokaal testen*.
+
+## 13. Nog niet gebouwd
+
+Onderdelen uit dit ontwerp die (nog) niet in de app zitten:
+
+| § | Onderdeel | Opmerking |
+|---|---|---|
+| 5.3 | Superadmin vraagt toegang aan tot gegevens van een stichting (met goedkeuring en logging) | Nu ziet de superadmin alleen aantallen |
+| 6.1 | Naam en plaats automatisch invullen via KVK; contact-e-mail bevestigen met een link | Bij aanmelden wordt alleen de plaats uit KVK overgenomen als die leeg is |
+| 6.2 | KVK Basisprofiel (rechtsvorm, actief) en domeincheck "geverifieerd" | Alleen Zoeken-API met `KVK_API_KEY` |
+| 7.2 | Alle leden in één keer uitnodigen voor Mijn omgeving | Nu per lid |
+| 9 | Akkoord op verwerkersovereenkomst en voorwaarden bij aanmelden (met datum en versie) | Nodig vóór productie |
+| 9 | Bewaartermijn van het logboek per stichting | Nu vast 41 dagen (`RETENTION` in `audit.py`) |
+| 9 | AI-inzichten per stichting aan/uit | Nu één instelling voor het hele platform |
+| 11 #6 | Slug wijzigen met doorverwijzing vanaf oude slugs | Slug ligt vast na aanmelden |
+
+Vervallen door besluiten: limiet voor nieuwe stichtingen (§ 6.4, besluit 2), leden die zichzelf
+koppelen (§ 7.2, besluit 4), Azure SQL (besluit 5) en de organisatiekeuze in een cookie (§ 9;
+de organisatie staat in de URL, besluit 6).

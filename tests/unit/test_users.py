@@ -176,19 +176,62 @@ def test_static_files_are_not_caught_by_legacy_redirect(client, path) -> None:
     assert client.get(path, follow_redirects=False).status_code == 200
 
 
-def test_invite_button_hidden_in_local_mode(client, database) -> None:
+def test_member_invitation_can_be_accepted_locally_by_switching_user(client, database) -> None:
     from test_my import add_member
 
     org = add_org(database, "stichting-l")
     grant(database, "baas", org, Role.BEHEERDER)
     member = add_member(database, org, "Lid L")
-    headers = {"X-Dev-User": "baas", "X-Dev-Roles": ""}
+    baas = {"X-Dev-User": "baas", "X-Dev-Roles": ""}
     url = f"/o/stichting-l/leden/{member}"
-    assert "Uitnodigen voor Mijn omgeving" not in client.get(url, headers=headers).text
+    assert "Uitnodigen voor Mijn omgeving" in client.get(url, headers=baas).text
+    token = client.cookies[CSRF_COOKIE]
+    invited = client.post(f"{url}/uitnodigen", data={"csrf_token": token}, headers=baas)
+    path = "/uitnodiging/" + invited.text.split("/uitnodiging/", 1)[1].split('"', 1)[0]
+
+    refused = client.post(path, data={"csrf_token": token})
+    assert "Meld u aan met dat e-mailadres" in refused.text
+    assert "/dev/gebruiker?terug=" in refused.text
+
+    switched = client.post(
+        "/dev/gebruiker",
+        data={"gebruiker": "LidL@x.nl", "terug": path, "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert switched.headers["location"] == path
+    accepted = client.post(path, data={"csrf_token": token}, follow_redirects=False)
+    assert accepted.headers["location"] == "/o/stichting-l/"
+    assert "Lid L" in client.get("/o/stichting-l/mijn").text
+    assert client.get("/o/stichting-l/leden").status_code == 403
+
+
+def test_dev_user_switch(client) -> None:
+    client.get("/")
+    token = client.cookies[CSRF_COOKIE]
+
+    def me() -> dict:
+        return client.get("/o/standaard/api/v1/me").json()
+
+    assert me()["name"] == "tester" and me()["roles"]
+    response = client.post(
+        "/dev/gebruiker",
+        data={"gebruiker": "nieuw@voorbeeld.nl", "terug": "//evil.example", "csrf_token": token},
+        follow_redirects=False,
+    )
+    assert response.headers["location"] == "/"
+    assert client.get("/o/standaard/leden").status_code == 404
+    assert "nieuw@voorbeeld.nl" in client.get("/dev/gebruiker").text
+
+    invalid = client.post("/dev/gebruiker", data={"gebruiker": "<script>", "csrf_token": token})
+    assert invalid.status_code == 422
+    assert client.post("/dev/gebruiker", data={"gebruiker": "x"}).status_code == 403
+
+    client.post("/dev/gebruiker", data={"actie": "standaard", "csrf_token": token})
+    assert me()["name"] == "tester"
+
+
+def test_dev_user_switch_is_unavailable_outside_dev_mode(client) -> None:
     client.app.state.settings = client.app.state.settings.model_copy(
         update={"auth_mode": AuthMode.EASYAUTH}
     )
-    from ledenadmin.auth.providers import DevAuthProvider
-
-    client.app.state.auth_provider = DevAuthProvider("ontwikkelaar", "")
-    assert "Uitnodigen voor Mijn omgeving" in client.get(url, headers=headers).text
+    assert client.get("/dev/gebruiker").status_code == 404

@@ -9,6 +9,7 @@ from sqlalchemy import func, select
 
 from ledenadmin.api.deps import CurrentIdentity, Superadmin
 from ledenadmin.audit import Action
+from ledenadmin.config import AuthMode
 from ledenadmin.domain.enums import OrganizationStatus
 from ledenadmin.domain.errors import NotFoundError
 from ledenadmin.domain.models import AuditLog, Organization
@@ -29,6 +30,7 @@ def _render(request: Request, template: str, context: dict, status_code: int = 2
         "principal": getattr(request.state, "principal", None),
         "csrf_token": request.state.csrf_token,
         "org": "",
+        "local_mode": request.app.state.settings.auth_mode == AuthMode.DEV,
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | context, status_code=status_code

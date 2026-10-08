@@ -1,0 +1,56 @@
+{#- Donatieformulier voor registreren en bewerken. Bij `locked` (online betaling) liggen lid,
+    bedrag en datum vast en worden ze alleen getoond. -#}
+{% from "macros.html" import field_error, invalid, form_error, csrf, date_field, member_picker %}
+<form method="post" action="{{ action }}" data-once novalidate {% if confirm %}data-confirm="{{ confirm }}"{% endif %}>
+  {{ csrf(csrf_token) }}
+  {% if terug %}<input type="hidden" name="terug" value="{{ terug }}">{% endif %}
+  {{ form_error(errors) }}
+  {% if locked %}
+  <label for="member_vast">Lid
+    <input id="member_vast" type="text" value="{{ donation.member_name }} ({{ donation.member_id }})" disabled>
+  </label>
+  {% else %}
+  {{ member_picker("member_id", "Lid", members, values.get('member_id', ''), "Kies een lid…", errors, required=True) }}
+  {% endif %}
+  <label for="subcategory_id">Categorie / subcategorie
+    <select id="subcategory_id" name="subcategory_id" required {{ invalid(errors, 'subcategory_id') }}>
+      <option value="">Kies een categorie…</option>
+      {% for category_name, subs in category_options %}
+      <optgroup label="{{ category_name }}">
+        {% for sub_id, label in subs %}
+        <option value="{{ sub_id }}" {% if values.get('subcategory_id') == sub_id|string %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </optgroup>
+      {% endfor %}
+    </select>
+    {{ field_error(errors, 'subcategory_id') }}
+  </label>
+  {% if locked %}
+  <div class="grid">
+    <label for="amount_vast">Bedrag (€)
+      <input id="amount_vast" type="text" value="{{ values.get('amount', '') }}" disabled>
+    </label>
+    <label for="donated_at_vast">Datum en tijd
+      <input id="donated_at_vast" type="text" value="{{ values.get('donated_at', '') | nl_datetime }}" disabled>
+    </label>
+  </div>
+  {% else %}
+  <div class="grid">
+    <label for="amount">Bedrag (€)
+      <input id="amount" name="amount" type="text" inputmode="decimal" required placeholder="25,00"
+             value="{{ values.get('amount', '') }}" {{ invalid(errors, 'amount') }}>
+      {{ field_error(errors, 'amount') }}
+    </label>
+    {{ date_field("donated_at", "Datum en tijd", values.get('donated_at', ''), errors, with_time=True, required=True) }}
+  </div>
+  {% endif %}
+  <label for="description">Omschrijving (optioneel)
+    <input id="description" name="description" type="text" maxlength="500"
+           value="{{ values.get('description', '') }}" {{ invalid(errors, 'description') }}>
+    {{ field_error(errors, 'description') }}
+  </label>
+  <div class="grid form-buttons">
+    <button type="submit">{{ submit_label }}</button>
+    {% if cancel_href %}<a role="button" class="secondary outline" href="{{ cancel_href }}">Annuleren</a>{% endif %}
+  </div>
+</form>

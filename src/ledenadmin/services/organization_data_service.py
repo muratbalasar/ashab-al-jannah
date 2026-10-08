@@ -17,6 +17,7 @@ from ledenadmin.domain.models import (
     AuditLog,
     Category,
     Donation,
+    DonationChange,
     Invitation,
     Member,
     MemberField,
@@ -33,7 +34,16 @@ logger = logging.getLogger(__name__)
 
 DELETE_GRACE = timedelta(days=30)
 # Volgorde van wissen: eerst wat naar andere tabellen verwijst.
-TENANT_TABLES = (Payment, MemberFieldValue, Donation, MemberField, Subcategory, Category, Member)
+TENANT_TABLES = (
+    Payment,
+    MemberFieldValue,
+    DonationChange,
+    Donation,
+    MemberField,
+    Subcategory,
+    Category,
+    Member,
+)
 
 
 def _iso(value: datetime | None) -> str:
@@ -116,6 +126,17 @@ class OrganizationDataService:
                 }
                 for d in rows(Donation)
             ],
+            "donatiewijzigingen": [
+                {
+                    "donatie_id": c.donation_id,
+                    "gewijzigd": _iso(c.changed_at),
+                    "door": c.changed_by,
+                    "veld": c.field,
+                    "oud": c.old_value,
+                    "nieuw": c.new_value,
+                }
+                for c in rows(DonationChange)
+            ],
             "categorieen": [
                 {
                     "categorie": categories.get(sc.category_id, ""),
@@ -140,7 +161,14 @@ class OrganizationDataService:
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("export.json", json.dumps(data, ensure_ascii=False, indent=2))
-            for key in ("leden", "donaties", "categorieen", "ledenvelden", "gebruikers"):
+            for key in (
+                "leden",
+                "donaties",
+                "donatiewijzigingen",
+                "categorieen",
+                "ledenvelden",
+                "gebruikers",
+            ):
                 archive.writestr(f"{key}.csv", _csv(data[key]))
         return buffer.getvalue()
 

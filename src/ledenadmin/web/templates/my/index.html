@@ -61,7 +61,7 @@
   </div>
   {% endif %}
   <h3>Donaties</h3>
-  {% with donations=report.donations, hide_member=True %}{% include "donations/_table.html" %}{% endwith %}
+  {% with donations=report.donations, hide_member=True, edit_links=False %}{% include "donations/_table.html" %}{% endwith %}
 </section>
 {% endif %}
 {% endblock %}

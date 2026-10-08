@@ -75,7 +75,7 @@ class Database:
                 cursor.close()
 
             return engine
-        # pool_pre_ping vangt verbroken verbindingen op, bijv. na auto-pause van Azure SQL.
+        # pool_pre_ping vangt verbroken verbindingen op bij een databaseserver (bijv. PostgreSQL).
         return create_engine(url, pool_pre_ping=True, pool_recycle=1800)
 
     def create_all(self) -> None:
