@@ -10,5 +10,7 @@ htmlcov/
 output/
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 .env
 __git-token.txt

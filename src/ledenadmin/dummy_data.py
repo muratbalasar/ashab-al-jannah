@@ -14,6 +14,7 @@ from ledenadmin.db import Database
 from ledenadmin.domain.enums import MemberStatus
 from ledenadmin.domain.models import Donation, Member, Subcategory
 from ledenadmin.services.category_service import CategoryService
+from ledenadmin.services.organization_service import ensure_default_organization
 
 DUMMY_DOMAIN = "voorbeeld.nl"
 DUMMY_CREATED_BY = "dummy-data"
@@ -85,6 +86,8 @@ def main() -> None:
     url = os.environ.get("DATABASE_URL", "sqlite:///./ledenadmin.db")
     database = Database(url)
     with database.session() as session:
+        organization_id = ensure_default_organization(session)
+    with database.session(organization_id) as session:
         members, donations = seed(session)
     print(f"Dummy data: {members} leden en {donations} donaties toegevoegd.")
 

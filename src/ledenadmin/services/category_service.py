@@ -5,10 +5,19 @@ from ledenadmin.domain.errors import ConflictError, NotFoundError
 from ledenadmin.domain.models import Category, Subcategory
 from ledenadmin.repositories.categories import CategoryRepository
 
+# Gangbare doelen bij islamitische stichtingen en goede doelen; per stichting aan te passen.
 DEFAULT_CATEGORIES: dict[str, list[str]] = {
+    "Zakat": ["Zakat al-Maal", "Zakat al-Fitr"],
+    "Sadaka": ["Algemeen", "Sadaka Jariya", "Waterput", "Wees sponsoren"],
+    "Ramadan": ["Iftar", "Voedselpakket"],
+    "Kurban": ["Kurban", "Akika", "Adak"],
+    "Fidya en Kaffara": ["Fidya", "Kaffara"],
+    "Noodhulp": ["Algemeen", "Natuurramp"],
+    "Onderwijs": ["Koranonderwijs", "Studiebeurs"],
+    "Moskee": ["Onderhoud", "Nieuwbouw"],
+    "Hadj en Umrah": ["Hadj", "Umrah"],
+    "Sponsoring": ["Bedrijven", "Particulier"],
     "Contributie": ["Jaarlijks", "Maandelijks"],
-    "Donatie": ["Algemeen", "Project"],
-    "Sponsoring": ["MKB", "Particulier"],
 }
 
 

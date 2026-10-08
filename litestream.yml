@@ -1,0 +1,13 @@
+# Litestream: continue back-up van de SQLite-database naar Azure Blob Storage.
+# Zie README, "Back-up en herstel". Alle waarden komen uit omgevingsvariabelen;
+# docker-entrypoint.sh zet LITESTREAM_DB_PATH (uit DATABASE_URL) en LITESTREAM_RETENTION.
+snapshot:
+  # Elke dag een volledige kopie; terugzetten kan tot LITESTREAM_RETENTION terug in de tijd.
+  interval: 24h
+  retention: ${LITESTREAM_RETENTION}
+
+dbs:
+  - path: ${LITESTREAM_DB_PATH}
+    replica:
+      # Azure: abs://<opslagaccount>@<container>/<pad>; aanmelden met de managed identity.
+      url: ${LITESTREAM_REPLICA_URL}

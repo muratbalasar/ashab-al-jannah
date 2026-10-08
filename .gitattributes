@@ -1,0 +1,2 @@
+# Shellscripts draaien in Linux-containers: altijd LF-regeleinden, ook bij een checkout op Windows.
+*.sh text eol=lf

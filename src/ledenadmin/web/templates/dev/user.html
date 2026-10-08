@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}Gebruiker wisselen (lokaal) – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Gebruiker wisselen <small class="env-badge">dev</small></h1>
+<p>U bent lokaal aangemeld als <strong>{{ current }}</strong> ({{ current_email }}).
+  Dit werkt alleen in de ontwikkelmodus (<code>AUTH_MODE=dev</code>) en geldt voor deze browser.</p>
+<p><small>Vul een e-mailadres in om een uitnodiging voor dat adres te accepteren. Een gewisselde
+  gebruiker krijgt geen rollen uit <code>DEV_USER_ROLES</code>, maar alleen de rollen uit
+  uitnodigingen. Andere gebruikers tegelijk testen? Gebruik een privévenster.</small></p>
+{% if error %}<p role="alert" class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/dev/gebruiker">
+  {{ csrf(csrf_token) }}
+  <input type="hidden" name="terug" value="{{ terug }}">
+  <label for="gebruiker">Gebruikersnaam of e-mailadres
+    <input id="gebruiker" name="gebruiker" type="text" maxlength="301" autocomplete="off"
+           spellcheck="false" placeholder="naam@voorbeeld.nl" autofocus>
+  </label>
+  <button type="submit" name="actie" value="wissel">Aanmelden als deze gebruiker</button>
+  {% if switched %}
+  <button type="submit" name="actie" value="standaard" class="secondary">Terug naar {{ default_user }}</button>
+  {% endif %}
+</form>
+{% endblock %}

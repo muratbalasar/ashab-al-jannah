@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Donatie bewerken – {{ app_name }}{% endblock %}
+{% block content %}
+<hgroup>
+  <h1>Donatie bewerken</h1>
+  <p>Donatie {{ donation.id }} · geregistreerd door {{ donation.created_by }} op {{ donation.created_at | localdt }}</p>
+</hgroup>
+{% if online %}
+<p class="info-bar">Deze donatie is online betaald via Mollie. Lid, bedrag en datum komen van de betaling en liggen vast; categorie en omschrijving kunt u aanpassen.</p>
+{% endif %}
+{% if past_year %}
+<p class="info-bar warning" role="note"><strong>Let op:</strong> deze donatie valt in {{ past_year }}. Een wijziging verandert de cijfers over dat jaar; eerder verstuurde rapporten en jaaroverzichten kloppen dan niet meer.</p>
+{% endif %}
+{% with action=org ~ "/donaties/" ~ donation.id ~ "/bewerken", submit_label="Wijzigingen opslaan", locked=online,
+        cancel_href=terug, confirm=("Deze donatie valt in " ~ past_year ~ ". Weet u zeker dat u de cijfers over dat jaar wilt wijzigen?") if past_year else "" %}
+  {% include "donations/_form.html" %}
+{% endwith %}
+
+<section aria-labelledby="historie-kop">
+  <h2 id="historie-kop">Wijzigingsgeschiedenis</h2>
+  {% if changes %}
+  <div class="overflow-auto">
+    <table class="striped">
+      <thead><tr><th scope="col">Gewijzigd</th><th scope="col">Door</th><th scope="col">Veld</th><th scope="col">Oud</th><th scope="col">Nieuw</th></tr></thead>
+      <tbody>
+        {% for c in changes %}
+        <tr>
+          <td>{{ c.changed_at | localdt }}</td>
+          <td>{{ c.changed_by }}</td>
+          <td>{{ c.field }}</td>
+          <td>{{ c.old_value }}</td>
+          <td>{{ c.new_value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>Deze donatie is nog niet gewijzigd.</p>
+  {% endif %}
+</section>
+{% endblock %}

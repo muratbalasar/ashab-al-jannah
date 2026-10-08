@@ -5,15 +5,15 @@
 <div class="page-head">
   <h1>Leden</h1>
   <div class="actions">
-    {% if principal.can(Permission.MEMBER_FIELDS_WRITE) %}<a role="button" href="/ledenvelden">Ledenvelden</a>{% endif %}
-    {% if principal.can(Permission.MEMBERS_WRITE) %}<a role="button" href="/leden/nieuw">Nieuw lid</a>{% endif %}
+    {% if principal.can(Permission.MEMBER_FIELDS_WRITE) %}<a role="button" href="{{ org }}/ledenvelden">Ledenvelden</a>{% endif %}
+    {% if principal.can(Permission.MEMBERS_WRITE) %}<a role="button" href="{{ org }}/leden/nieuw">Nieuw lid</a>{% endif %}
   </div>
 </div>
 {% include "members/_info.html" %}
 
 <search aria-label="Leden zoeken">
-<form class="member-filter" action="/leden" method="get"
-      hx-get="/leden" hx-target="#leden-tabel" hx-push-url="true"
+<form class="member-filter" action="{{ org }}/leden" method="get"
+      hx-get="{{ org }}/leden" hx-target="#leden-tabel" hx-push-url="true"
       hx-trigger="input changed delay:300ms from:#q, change from:#status, submit">
   <div class="grid">
     <label for="q">Zoek op naam of e-mail
@@ -32,7 +32,7 @@
 </search>
 
 {% if principal.can(Permission.MEMBERS_DELETE) %}
-<form id="leden-selectie" method="post" action="/leden/verwijderen" data-bulk-select
+<form id="leden-selectie" method="post" action="{{ org }}/leden/verwijderen" data-bulk-select
       data-one="lid" data-this="dit lid" data-many="leden"
       data-confirm-extra="Alle donaties en extra gegevens van deze leden worden ook verwijderd. Dit kan niet ongedaan worden gemaakt.">
   {{ csrf(csrf_token) }}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Help – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Help</h1>
+<p>Deze handleiding toont alleen de onderdelen die u met uw rol kunt gebruiken.</p>
+<nav aria-label="Inhoud handleiding" class="help-toc">
+  {% for anchor, title in sections %}<a href="#{{ anchor }}">{{ title }}</a>{% endfor %}
+</nav>
+{% for anchor, title in sections %}
+<article id="{{ anchor }}" aria-labelledby="h-{{ anchor }}">
+  <header><h2 id="h-{{ anchor }}">{{ title }}</h2></header>
+  {% include "help/" ~ anchor ~ ".html" %}
+</article>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "macros.html" import field_error, invalid, form_error, csrf, help_link %}
+{% block title %}Gebruikers – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Gebruikers {{ help_link(org ~ "/help#gebruikers", "Help bij gebruikers") }}</h1>
+{% if mail_enabled and mail_quota.exhausted %}
+<p class="info-bar">De daglimiet voor e-mail is bereikt. Deel de uitnodigingslink zelf.</p>
+{% elif mail_enabled and mail_quota.warning %}
+<p class="info-bar">Nog {{ mail_quota.remaining }} van {{ mail_quota.limit }} e-mails beschikbaar vandaag.</p>
+{% endif %}
+{% if link %}
+<article>
+  <p>{% if mailed %}De uitnodiging is per e-mail verstuurd. U kunt de link ook zelf delen:{% else %}Deel deze link met de uitgenodigde persoon (7 dagen geldig, één keer te gebruiken):{% endif %}</p>
+  <input type="text" readonly value="{{ link }}" aria-label="Uitnodigingslink" data-select-all>
+</article>
+{% endif %}
+{{ form_error(errors) }}
+<p><small>Hieronder staan alle personen met toegang tot deze stichting. Met ✕ trekt u één rol in; wie geen rol meer heeft, verliest de toegang.</small></p>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th scope="col">Naam</th><th scope="col">E-mail</th><th scope="col">Rollen</th></tr></thead>
+    <tbody>
+      {% for row in users %}
+      <tr>
+        <td>{{ row.user.display_name }}</td>
+        <td>{{ row.user.email or "–" }}</td>
+        <td>
+          {% for m in row.roles %}
+          <form method="post" action="{{ org }}/gebruikers/rollen/{{ m.id }}/verwijderen" class="inline role-chip"
+                data-confirm="Rol {{ role_labels.get(m.role, m.role) }} intrekken bij {{ row.user.display_name }}?">
+            {{ csrf(csrf_token) }}
+            <span>{{ role_labels.get(m.role, m.role) }}</span>
+            <button type="submit" class="outline secondary" title="Rol intrekken" aria-label="Rol {{ role_labels.get(m.role, m.role) }} intrekken">✕</button>
+          </form>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Uitnodigen</h2>
+<p><small>Geef iemand toegang: vul het e-mailadres en de rol in. U krijgt een link (7 dagen geldig) die per e-mail wordt verstuurd of die u zelf kunt delen.
+  <strong>Beheerder</strong>: alles · <strong>Penningmeester</strong>: donaties en rapportage · <strong>Bestuurder</strong>: alleen rapportage bekijken.</small></p>
+<form method="post" action="{{ org }}/gebruikers/uitnodigen" data-once novalidate>
+  {{ csrf(csrf_token) }}
+  <div class="grid">
+    <label for="email">E-mail
+      <input id="email" name="email" type="email" required maxlength="320" inputmode="email"
+             value="{{ values.get('email', '') }}" {{ invalid(errors, 'email') }}>
+      {{ field_error(errors, 'email') }}
+    </label>
+    <label for="role">Rol
+      <select id="role" name="role" required {{ invalid(errors, 'role') }}>
+        {% for r in roles %}<option value="{{ r.value }}" {% if values.get('role') == r.value %}selected{% endif %}>{{ role_labels[r.value] }}</option>{% endfor %}
+      </select>
+      {{ field_error(errors, 'role') }}
+    </label>
+  </div>
+  <button type="submit">Uitnodiging maken</button>
+</form>
+<p><small>Leden nodigt u uit vanaf hun pagina onder Leden.</small></p>
+
+{% if invitations %}
+<h2>Openstaande uitnodigingen</h2>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead><tr><th scope="col">E-mail</th><th scope="col">Rol</th><th scope="col">Geldig tot</th><th scope="col"><span class="visually-hidden">Actie</span></th></tr></thead>
+    <tbody>
+      {% for i in invitations %}
+      <tr>
+        <td>{{ i.email }}</td>
+        <td>{{ role_labels.get(i.role, i.role) }}</td>
+        <td>{{ i.expires_at | localdt("%d-%m-%Y %H:%M") }}</td>
+        <td>
+          <form method="post" action="{{ org }}/gebruikers/uitnodigingen/{{ i.id }}/intrekken">
+            {{ csrf(csrf_token) }}
+            <button type="submit" class="secondary">Intrekken</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

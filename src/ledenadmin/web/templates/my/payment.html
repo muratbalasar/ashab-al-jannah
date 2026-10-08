@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Betaling – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Betaling</h1>
+<p class="{{ 'notice' if payment.status == 'paid' else 'info-bar' }}" role="status">{{ message }}</p>
+<p>Bedrag: <strong>{{ payment.amount | eur }}</strong></p>
+<p><a href="{{ org }}/mijn" role="button" class="secondary">Terug naar Mijn omgeving</a></p>
+{% endblock %}

@@ -10,7 +10,7 @@ Library             String
 *** Variables ***
 ${BASE_URL}             http://127.0.0.1:8000
 ${HEALTH_TIMEOUT}       60s
-${API}                  /api/v1
+${API}                  /o/standaard/api/v1
 &{BEHEERDER}            X-Dev-Roles=beheerder           X-Dev-User=robot-beheerder
 &{PENNINGMEESTER}       X-Dev-Roles=penningmeester      X-Dev-User=robot-penningmeester
 &{BESTUURDER}           X-Dev-Roles=bestuurder          X-Dev-User=robot-bestuurder
@@ -19,7 +19,7 @@ ${API}                  /api/v1
 *** Keywords ***
 Maak API-sessie
     Create Session    api    ${BASE_URL}    disable_warnings=1
-    Wait Until Keyword Succeeds    ${HEALTH_TIMEOUT}    2s    GET On Session    api    ${API}/health    expected_status=200
+    Wait Until Keyword Succeeds    ${HEALTH_TIMEOUT}    2s    GET On Session    api    /api/v1/health    expected_status=200
 
 Unieke code
     ${code}=    Generate Random String    8    [LOWER][NUMBERS]
@@ -57,7 +57,7 @@ Subcategorie-id van
     Fail    Subcategorie ${categorie} / ${subcategorie} bestaat niet
 
 Registreer donatie
-    [Arguments]    ${lid_id}    ${bedrag}    ${categorie}=Sponsoring    ${subcategorie}=MKB
+    [Arguments]    ${lid_id}    ${bedrag}    ${categorie}=Sadaka    ${subcategorie}=Waterput
     ...    ${datum}=${NONE}    ${expected_status}=201
     ${sub_id}=    Subcategorie-id van    ${categorie}    ${subcategorie}
     ${body}=    Create Dictionary    member_id=${lid_id}    subcategory_id=${sub_id}    amount=${bedrag}

@@ -11,7 +11,7 @@
     {% if not report.is_empty %}
     <span class="export-links">
       {% if principal.can(Permission.EXPORT) %}
-      <a href="/api/v1/reports/export.csv?{{ export_query }}" download>Exporteer CSV</a>
+      <a href="{{ org }}/api/v1/reports/export.csv?{{ export_query }}" download>Exporteer CSV</a>
       {% endif %}
       <a href="#" data-print-report title="Kies in het printvenster 'Opslaan als PDF'">Exporteer PDF</a>
     </span>

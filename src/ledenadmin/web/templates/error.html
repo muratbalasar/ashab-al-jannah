@@ -4,6 +4,7 @@
 <article>
   <h1>Er ging iets mis</h1>
   <p role="alert">{{ message }}</p>
-  <p><a href="/">Terug naar het overzicht</a></p>
+  {% if error_code %}<p><small>Foutcode: <code data-select-all>{{ error_code }}</code></small></p>{% endif %}
+  <p><a href="{{ org }}/">Terug naar het overzicht</a></p>
 </article>
 {% endblock %}

@@ -2,11 +2,12 @@ import base64
 import binascii
 import json
 import logging
+import re
 from typing import Protocol
 
 from starlette.requests import Request
 
-from ledenadmin.auth.principal import Principal, parse_roles
+from ledenadmin.auth.principal import Identity, parse_roles
 from ledenadmin.config import AuthMode, Settings
 
 logger = logging.getLogger(__name__)
@@ -15,12 +16,30 @@ EASYAUTH_PRINCIPAL_HEADER = "x-ms-client-principal"
 EASYAUTH_NAME_HEADER = "x-ms-client-principal-name"
 DEV_USER_HEADER = "x-dev-user"
 DEV_ROLES_HEADER = "x-dev-roles"
+EASYAUTH_IDP_HEADER = "x-ms-client-principal-idp"
+DEV_ISSUER = "dev"
+DEV_USER_COOKIE = "dev_user"
+DEV_USER_PATTERN = re.compile(r"[A-Za-z0-9._+-]{1,100}(@[A-Za-z0-9.-]{1,200})?")
+# Entra zet het object-id in 'oid' of de lange claimnaam; andere providers gebruiken 'sub'.
+SUBJECT_CLAIMS = (
+    "http://schemas.microsoft.com/identity/claims/objectidentifier",
+    "oid",
+    "sub",
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier",
+)
+EMAIL_CLAIMS = (
+    "email",
+    "emails",
+    "preferred_username",
+    "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+)
+EMAIL_VERIFIED_CLAIM = "email_verified"
 
 
 class AuthProvider(Protocol):
     login_url: str | None
 
-    def authenticate(self, request: Request) -> Principal | None: ...
+    def authenticate(self, request: Request) -> Identity | None: ...
 
 
 class EasyAuthProvider:
@@ -30,12 +49,11 @@ class EasyAuthProvider:
     request, zodat clients ze niet zelf kunnen meesturen.
     """
 
-    login_url = "/.auth/login/aad"
-
-    def __init__(self, role_claim_type: str = "roles") -> None:
+    def __init__(self, role_claim_type: str = "roles", login_url: str = "/.auth/login/aad") -> None:
         self._role_claim_type = role_claim_type
+        self.login_url = login_url
 
-    def authenticate(self, request: Request) -> Principal | None:
+    def authenticate(self, request: Request) -> Identity | None:
         raw = request.headers.get(EASYAUTH_PRINCIPAL_HEADER)
         if not raw:
             return None
@@ -46,17 +64,40 @@ class EasyAuthProvider:
             return None
 
         claims = payload.get("claims") or []
+
+        def claim(*types: str) -> str | None:
+            return next(
+                (c.get("val") for c in claims if c.get("typ") in types and c.get("val")), None
+            )
+
         role_types = {self._role_claim_type, payload.get("role_typ")}
-        name_type = payload.get("name_typ")
         roles = parse_roles(c.get("val", "") for c in claims if c.get("typ") in role_types)
-        name = request.headers.get(EASYAUTH_NAME_HEADER) or next(
-            (c.get("val") for c in claims if c.get("typ") in (name_type, "name")), "onbekend"
+        subject = claim(*SUBJECT_CLAIMS)
+        if not subject:
+            logger.warning("Easy Auth principal zonder subject-claim ontvangen")
+            return None
+        issuer = claim("iss") or request.headers.get(EASYAUTH_IDP_HEADER) or "onbekend"
+        email = claim(*EMAIL_CLAIMS)
+        # Een expliciet niet-geverifieerd e-mailadres telt niet: het koppelt uitnodigingen.
+        if (claim(EMAIL_VERIFIED_CLAIM) or "").lower() == "false" or "@" not in (email or ""):
+            email = None
+        name = (
+            request.headers.get(EASYAUTH_NAME_HEADER)
+            or claim(payload.get("name_typ") or "name", "name")
+            or email
+            or "onbekend"
         )
-        return Principal(name=name, roles=roles)
+        return Identity(issuer, subject, name, email, roles)
 
 
 class DevAuthProvider:
-    """Alleen voor lokale ontwikkeling en tests; geweigerd als APP_ENV=production."""
+    """Alleen voor lokale ontwikkeling en tests; geweigerd als APP_ENV=production.
+
+    De gebruiker komt uit de header X-Dev-User, anders uit het cookie dat /dev/gebruiker zet,
+    anders uit DEV_USER_NAME. Een naam met @ is meteen het e-mailadres, zodat u lokaal een
+    uitnodiging voor een echt e-mailadres kunt accepteren. Een gebruiker uit het cookie
+    krijgt geen rollen uit DEV_USER_ROLES: die gedraagt zich als een nieuwe externe gebruiker.
+    """
 
     login_url = None
 
@@ -64,15 +105,30 @@ class DevAuthProvider:
         self._user_name = user_name
         self._roles = parse_roles(roles.split(","))
 
-    def authenticate(self, request: Request) -> Principal | None:
-        name = request.headers.get(DEV_USER_HEADER) or self._user_name
+    def authenticate(self, request: Request) -> Identity | None:
+        cookie_user = clean_dev_user(request.cookies.get(DEV_USER_COOKIE, ""))
+        name = request.headers.get(DEV_USER_HEADER) or cookie_user or self._user_name
         roles_header = request.headers.get(DEV_ROLES_HEADER)
-        roles = parse_roles(roles_header.split(",")) if roles_header is not None else self._roles
-        return Principal(name=name, roles=roles)
+        if roles_header is not None:
+            roles = parse_roles(roles_header.split(","))
+        elif cookie_user and not request.headers.get(DEV_USER_HEADER):
+            roles = frozenset()
+        else:
+            roles = self._roles
+        if "@" in name:
+            name = name.lower()
+            return Identity(DEV_ISSUER, name, name, name, roles)
+        return Identity(DEV_ISSUER, name, name, f"{name}@dev.local", roles)
+
+
+def clean_dev_user(value: str) -> str | None:
+    """Gebruikersnaam of e-mailadres voor de dev-login; None als het geen geldige waarde is."""
+    value = (value or "").strip()
+    return value if DEV_USER_PATTERN.fullmatch(value) else None
 
 
 def build_auth_provider(settings: Settings) -> AuthProvider:
     if settings.auth_mode == AuthMode.DEV:
         logger.warning("AUTH_MODE=dev actief: authenticatie is uitgeschakeld (alleen lokaal!)")
         return DevAuthProvider(settings.dev_user_name, settings.dev_user_roles)
-    return EasyAuthProvider(settings.role_claim_type)
+    return EasyAuthProvider(settings.role_claim_type, settings.easyauth_login_url)

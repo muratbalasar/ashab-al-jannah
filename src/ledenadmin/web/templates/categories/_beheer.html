@@ -27,7 +27,7 @@
 {%- endmacro %}
 
 {% macro cancel_link(anchor) -%}
-<a href="/categorieen#{{ anchor }}" hx-get="/categorieen" class="link-action muted">Annuleren</a>
+<a href="{{ org }}/categorieen#{{ anchor }}" hx-get="{{ org }}/categorieen" class="link-action muted">Annuleren</a>
 {%- endmacro %}
 
 {% macro row(state, key, name, is_active, action, label, anchor, tag, deletable) -%}
@@ -38,8 +38,8 @@
 {% else %}
   <{{ tag }} class="cat-name">{{ name }}{% if not is_active %} <span class="inactive-tag">inactief</span>{% endif %}</{{ tag }}>
   <div class="row-actions">
-    <a id="wijzig-{{ key }}" class="link-action" href="/categorieen?bewerk={{ key }}#{{ anchor }}"
-       hx-get="/categorieen?bewerk={{ key }}" aria-label="{{ name }} wijzigen">Wijzigen</a>
+    <a id="wijzig-{{ key }}" class="link-action" href="{{ org }}/categorieen?bewerk={{ key }}#{{ anchor }}"
+       hx-get="{{ org }}/categorieen?bewerk={{ key }}" aria-label="{{ name }} wijzigen">Wijzigen</a>
     <form method="post" action="{{ action }}/status" hx-post="{{ action }}/status" data-once>
       {{ csrf(state.token) }}
       <input type="hidden" name="is_active" value="{{ 'false' if is_active else 'true' }}">
@@ -77,8 +77,8 @@
           {{ cancel_link(anchor) }}
         </div>
         {% else %}
-        <a id="toevoegen-{{ c.id }}" class="link-action" href="/categorieen?bewerk=nieuw-{{ c.id }}#{{ anchor }}"
-           hx-get="/categorieen?bewerk=nieuw-{{ c.id }}">+ Subcategorie toevoegen</a>
+        <a id="toevoegen-{{ c.id }}" class="link-action" href="{{ org }}/categorieen?bewerk=nieuw-{{ c.id }}#{{ anchor }}"
+           hx-get="{{ org }}/categorieen?bewerk=nieuw-{{ c.id }}">+ Subcategorie toevoegen</a>
         {% endif %}
       </li>
     </ul>

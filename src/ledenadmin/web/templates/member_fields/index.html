@@ -2,7 +2,7 @@
 {% from "macros.html" import field_error, invalid, csrf %}
 {% block title %}Ledenvelden – {{ app_name }}{% endblock %}
 {% block content %}
-<nav aria-label="Kruimelpad"><ul><li><a href="/leden">Leden</a></li><li>Ledenvelden</li></ul></nav>
+<nav aria-label="Kruimelpad"><ul><li><a href="{{ org }}/leden">Leden</a></li><li>Ledenvelden</li></ul></nav>
 <hgroup>
   <h1>Ledenvelden</h1>
   <p>Extra velden die bij elk lid worden getoond, bijvoorbeeld een telefoonnummer of nieuwsbrief.</p>
@@ -10,7 +10,7 @@
 
 <article>
   <h2>Nieuw veld</h2>
-  <form method="post" action="/ledenvelden" novalidate>
+  <form method="post" action="{{ org }}/ledenvelden" novalidate>
     {{ csrf(csrf_token) }}
     <div class="field-row">
       <label for="label">Naam
@@ -43,12 +43,12 @@
         <td>{{ type_labels.get(f.field_type, f.field_type) }}</td>
         <td><span class="badge {{ 'actief' if f.is_active else 'inactief' }}">{{ 'Actief' if f.is_active else 'Inactief' }}</span></td>
         <td class="row-actions">
-          <form method="post" action="/ledenvelden/{{ f.id }}/status">
+          <form method="post" action="{{ org }}/ledenvelden/{{ f.id }}/status">
             {{ csrf(csrf_token) }}
             <input type="hidden" name="is_active" value="{{ 'false' if f.is_active else 'true' }}">
             <button type="submit" class="link-action">{{ 'Deactiveren' if f.is_active else 'Activeren' }}</button>
           </form>
-          <form method="post" action="/ledenvelden/{{ f.id }}/verwijderen" data-confirm="Veld '{{ f.label }}' en alle ingevulde waarden verwijderen?">
+          <form method="post" action="{{ org }}/ledenvelden/{{ f.id }}/verwijderen" data-confirm="Veld '{{ f.label }}' en alle ingevulde waarden verwijderen?">
             {{ csrf(csrf_token) }}
             <button type="submit" class="link-action danger">Verwijderen</button>
           </form>

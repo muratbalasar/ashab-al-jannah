@@ -24,7 +24,6 @@ updates:
           - "sqlalchemy"
           - "alembic"
           - "pandas"
-          - "pyodbc"
       dev:
         patterns:
           - "pytest*"

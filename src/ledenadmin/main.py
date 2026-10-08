@@ -14,7 +14,16 @@ from ledenadmin.config import Settings, get_settings
 from ledenadmin.db import Database
 from ledenadmin.services.ai.insight_service import InsightService, build_insight_provider
 from ledenadmin.services.category_service import CategoryService
+from ledenadmin.services.kvk_service import build_kvk_lookup
+from ledenadmin.services.mail_service import build_mail_transport
+from ledenadmin.services.organization_data_service import OrganizationDataService
+from ledenadmin.services.organization_service import ensure_default_organization
+from ledenadmin.services.payment_service import HttpMollieApi, SecretBox
+from ledenadmin.web import dev as web_dev
+from ledenadmin.web import payments as web_payments
+from ledenadmin.web import platform as web_platform
 from ledenadmin.web import routes as web_routes
+from ledenadmin.web import users as web_users
 from ledenadmin.web.security import SecurityMiddleware
 from ledenadmin.web.templating import STATIC_DIR, build_templates
 
@@ -28,8 +37,12 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        with database.session() as session:
+            app.state.organization_id = ensure_default_organization(session)
+            if purged := OrganizationDataService(session).purge_expired():
+                logger.info("%s verwijderde organisatie(s) definitief gewist", purged)
         if settings.seed_default_categories:
-            with database.session() as session:
+            with database.session(app.state.organization_id) as session:
                 if CategoryService(session).ensure_defaults():
                     logger.info("Standaardcategorieën aangemaakt")
         yield
@@ -48,15 +61,32 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.state.auth_provider = build_auth_provider(settings)
     app.state.insights = InsightService(build_insight_provider(settings))
     app.state.templates = build_templates(settings.tz)
+    app.state.kvk_lookup = build_kvk_lookup(settings.kvk_api_key, settings.kvk_api_url)
+    app.state.secret_box = SecretBox(settings.secret_encryption_key)
+    app.state.mollie_api = HttpMollieApi(settings.mollie_api_url)
+    app.state.mail_transport = build_mail_transport(
+        settings.brevo_api_key, settings.mail_sender_email, settings.mail_sender_name
+    )
 
     app.add_middleware(AuditMiddleware)
     app.add_middleware(SecurityMiddleware, secure_cookies=settings.is_production)
     register_error_handlers(app)
 
+    # Eerst mounten: anders vangt de legacy-route /{section}/... ook /static/... af.
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    # Gegevens per organisatie: web en API onder /o/{org}/...; health blijft globaal.
+    app.include_router(system.public_router, prefix="/api/v1")
+    org = APIRouter(prefix="/o/{org}")
     api = APIRouter(prefix="/api/v1")
     for module in (system, members, categories, donations, reports):
         api.include_router(module.router)
-    app.include_router(api)
-    app.include_router(web_routes.router)
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    org.include_router(api)
+    org.include_router(web_routes.router)
+    org.include_router(web_users.org_router)
+    org.include_router(web_payments.org_router)
+    app.include_router(org)
+    app.include_router(web_users.public_router)
+    app.include_router(web_payments.webhook_router)
+    app.include_router(web_dev.router)
+    app.include_router(web_platform.router)
     return app

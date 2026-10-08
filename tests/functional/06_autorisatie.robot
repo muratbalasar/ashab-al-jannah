@@ -62,7 +62,7 @@ de penningmeester een categorie probeert aan te maken
 
 de beheerder een donatie registreert
     ${lid}=    Maak lid aan    Beheerder Lid
-    ${sub_id}=    Subcategorie-id van    Sponsoring    MKB
+    ${sub_id}=    Subcategorie-id van    Sadaka    Waterput
     ${body}=    Create Dictionary    member_id=${lid}[id]    subcategory_id=${sub_id}    amount=7.50
     ${resp}=    POST On Session    api    ${API}/donations    json=${body}    headers=${BEHEERDER}
     ...    expected_status=anything
@@ -76,6 +76,6 @@ kan de beheerder de CSV-export downloaden
 
 een formulier zonder CSRF-token wordt verstuurd
     ${form}=    Create Dictionary    name=Zonder Token    email=geen-token@example.nl
-    ${resp}=    POST On Session    api    /leden    data=${form}    headers=${BEHEERDER}
+    ${resp}=    POST On Session    api    /o/standaard/leden    data=${form}    headers=${BEHEERDER}
     ...    expected_status=anything
     Set Test Variable    ${RESP}    ${resp}

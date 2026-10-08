@@ -1,3 +1,5 @@
+{% set editable = (edit_links is not defined or edit_links) and principal and principal.can(Permission.DONATIONS_EDIT) %}
+{% set terug_url = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
 {% if donations %}
 <div class="overflow-auto">
   <table class="striped">
@@ -9,6 +11,7 @@
         <th scope="col">Categorie</th>
         <th scope="col" class="hide-sm">Subcategorie</th>
         <th scope="col" class="num">Bedrag</th>
+        {% if editable %}<th scope="col" class="edit-col"><span class="visually-hidden">Bewerken</span></th>{% endif %}
       </tr>
     </thead>
     <tbody data-paginate>
@@ -16,10 +19,21 @@
       <tr>
         {% if selectable %}<td class="select-col"><input type="checkbox" name="ids" value="{{ d.id }}" data-select-row aria-label="Donatie {{ d.donated_at | localdt }} {{ d.member_name }} {{ d.amount | eur }} selecteren"></td>{% endif %}
         <td>{{ d.donated_at | localdt }}</td>
-        {% if not hide_member %}<td><a href="/leden/{{ d.member_id }}">{{ d.member_name }}</a></td>{% endif %}
+        {% if not hide_member %}<td><a href="{{ org }}/leden/{{ d.member_id }}">{{ d.member_name }}</a></td>{% endif %}
         <td>{{ d.category }}</td>
         <td class="hide-sm">{{ d.subcategory }}</td>
         <td class="num">{{ d.amount | eur }}</td>
+        {% if editable %}
+        <td class="edit-col">
+          <a href="{{ org }}/donaties/{{ d.id }}/bewerken?terug={{ terug_url | urlencode }}" class="icon-link"
+             title="Donatie bewerken" aria-label="Donatie {{ d.donated_at | localdt }} van {{ d.member_name }} ({{ d.amount | eur }}) bewerken">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+            </svg>
+          </a>
+        </td>
+        {% endif %}
       </tr>
       {% endfor %}
     </tbody>

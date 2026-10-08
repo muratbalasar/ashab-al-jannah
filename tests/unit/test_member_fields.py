@@ -68,24 +68,28 @@ def test_bsn_value_is_blocked() -> None:
 
 def test_admin_manages_fields_and_member_values(csrf_client, session) -> None:
     c = csrf_client
+    o = "/o/standaard"
     base = {"csrf_token": c.csrf}
-    blocked = c.post("/ledenvelden", data=base | {"label": "BSN", "field_type": "nummer"},
+    blocked = c.post(f"{o}/ledenvelden", data=base | {"label": "BSN", "field_type": "nummer"},
                      headers=BEHEERDER)  # fmt: skip
     assert blocked.status_code == 422 and "AVG" in blocked.text
     for label, kind in [("Telefoon", "mobiel"), ("IBAN", "iban"), ("Nieuwsbrief", "ja_nee")]:
-        r = c.post("/ledenvelden", data=base | {"label": label, "field_type": kind},
+        r = c.post(f"{o}/ledenvelden", data=base | {"label": label, "field_type": kind},
                    headers=BEHEERDER, follow_redirects=False)  # fmt: skip
         assert r.status_code == 303
-    dup = c.post("/ledenvelden", data=base | {"label": "Telefoon", "field_type": "tekst"},
+    dup = c.post(f"{o}/ledenvelden", data=base | {"label": "Telefoon", "field_type": "tekst"},
                  headers=BEHEERDER)  # fmt: skip
     assert dup.status_code == 422
     fields = {f.label: f.id for f in MemberFieldService(session).list()}
     tel, iban, news = (f"veld_{fields[k]}" for k in ("Telefoon", "IBAN", "Nieuwsbrief"))
 
     form = base | {"name": "Ali", "email": "ali@x.nl", "status": "actief"}
-    bad = c.post("/leden", data=form | {tel: "123", iban: "NL00XXXX"}, headers=BEHEERDER)
+    bad = c.post(
+        "/o/standaard/leden", data=form | {tel: "123", iban: "NL00XXXX"}, headers=BEHEERDER
+    )
     assert bad.status_code == 422 and "mobiel" in bad.text and "IBAN" in bad.text
-    ok = c.post("/leden", data=form | {tel: "06 12345678", iban: "NL91ABNA0417164300", news: "ja"},
+    extra = {tel: "06 12345678", iban: "NL91ABNA0417164300", news: "ja"}
+    ok = c.post(f"{o}/leden", data=form | extra,
                 headers=BEHEERDER, follow_redirects=False)  # fmt: skip
     assert ok.status_code == 303
     detail = c.get(ok.headers["location"], headers=BEHEERDER).text
@@ -96,19 +100,27 @@ def test_admin_manages_fields_and_member_values(csrf_client, session) -> None:
     c.post(member_url, data=form | {tel: ""}, headers=BEHEERDER)
     assert 'value="0612345678"' not in c.get(member_url, headers=BEHEERDER).text
 
-    r = c.post(f"/ledenvelden/{fields['Telefoon']}/verwijderen", data=base, headers=BEHEERDER,
+    r = c.post(f"{o}/ledenvelden/{fields['Telefoon']}/verwijderen", data=base, headers=BEHEERDER,
                follow_redirects=False)  # fmt: skip
     assert r.status_code == 303
-    assert "<td>Telefoon</td>" not in c.get("/ledenvelden", headers=BEHEERDER).text
+    assert "<td>Telefoon</td>" not in c.get("/o/standaard/ledenvelden", headers=BEHEERDER).text
 
 
 def test_fields_page_only_for_beheerder(client) -> None:
     for role in ("penningmeester", "bestuurder"):
-        assert client.get("/ledenvelden", headers={"X-Dev-Roles": role}).status_code == 403
-        assert 'href="/ledenvelden"' not in client.get("/leden", headers={"X-Dev-Roles": role}).text
+        assert (
+            client.get("/o/standaard/ledenvelden", headers={"X-Dev-Roles": role}).status_code == 403
+        )
+        assert (
+            'href="/o/standaard/ledenvelden"'
+            not in client.get("/o/standaard/leden", headers={"X-Dev-Roles": role}).text
+        )
 
 
 def test_fields_link_on_members_page_not_in_main_nav(client) -> None:
-    html = client.get("/leden", headers=BEHEERDER).text
-    assert html.count('href="/ledenvelden"') == 1
-    assert 'href="/ledenvelden"' not in client.get("/donaties", headers=BEHEERDER).text
+    html = client.get("/o/standaard/leden", headers=BEHEERDER).text
+    assert html.count('href="/o/standaard/ledenvelden"') == 1
+    assert (
+        'href="/o/standaard/ledenvelden"'
+        not in client.get("/o/standaard/donaties", headers=BEHEERDER).text
+    )

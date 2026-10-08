@@ -1,38 +1,8 @@
 {% extends "base.html" %}
-{% from "macros.html" import field_error, invalid, form_error, csrf, date_field, member_picker %}
 {% block title %}Donatie registreren – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Donatie registreren</h1>
-<form method="post" action="/donaties" data-once novalidate>
-  {{ csrf(csrf_token) }}
-  {{ form_error(errors) }}
-  {{ member_picker("member_id", "Lid", members, values.get('member_id', ''), "Kies een lid…", errors, required=True) }}
-  <label for="subcategory_id">Categorie / subcategorie
-    <select id="subcategory_id" name="subcategory_id" required {{ invalid(errors, 'subcategory_id') }}>
-      <option value="">Kies een categorie…</option>
-      {% for c in categories %}
-      <optgroup label="{{ c.name }}">
-        {% for s in c.subcategories if s.is_active %}
-        <option value="{{ s.id }}" {% if values.get('subcategory_id') == s.id|string %}selected{% endif %}>{{ c.name }} – {{ s.name }}</option>
-        {% endfor %}
-      </optgroup>
-      {% endfor %}
-    </select>
-    {{ field_error(errors, 'subcategory_id') }}
-  </label>
-  <div class="grid">
-    <label for="amount">Bedrag (€)
-      <input id="amount" name="amount" type="text" inputmode="decimal" required placeholder="25,00"
-             value="{{ values.get('amount', '') }}" {{ invalid(errors, 'amount') }}>
-      {{ field_error(errors, 'amount') }}
-    </label>
-    {{ date_field("donated_at", "Datum en tijd", values.get('donated_at', ''), errors, with_time=True, required=True) }}
-  </div>
-  <label for="description">Omschrijving (optioneel)
-    <input id="description" name="description" type="text" maxlength="500"
-           value="{{ values.get('description', '') }}" {{ invalid(errors, 'description') }}>
-    {{ field_error(errors, 'description') }}
-  </label>
-  <button type="submit">Donatie opslaan</button>
-</form>
+{% with action=org ~ "/donaties", submit_label="Donatie opslaan", locked=False, terug="", cancel_href="", confirm="" %}
+  {% include "donations/_form.html" %}
+{% endwith %}
 {% endblock %}

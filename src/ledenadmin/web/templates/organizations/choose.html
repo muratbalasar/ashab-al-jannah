@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Kies een organisatie – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Kies een organisatie</h1>
+{% if deleted %}<p class="notice" role="status">De organisatie is verwijderd. Na 30 dagen worden alle gegevens definitief gewist.</p>{% endif %}
+{% if choices %}
+<ul>
+  {% for slug, name in choices %}<li><a href="/o/{{ slug }}/">{{ name }}</a></li>{% endfor %}
+</ul>
+{% else %}
+<p>Je bent nog niet gekoppeld aan een organisatie. Vraag een beheerder van je stichting om een uitnodiging.</p>
+{% endif %}
+<p><a href="/aanmelden" role="button" class="secondary">Nieuwe stichting aanmaken</a></p>
+{% endblock %}

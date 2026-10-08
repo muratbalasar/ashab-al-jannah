@@ -2,7 +2,7 @@
 {% block title %}Nieuw lid – {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Nieuw lid</h1>
-{% with action="/leden", submit_label="Lid opslaan", readonly=False %}
+{% with action=org ~ "/leden", submit_label="Lid opslaan", readonly=False %}
   {% include "members/_form.html" %}
 {% endwith %}
 {% endblock %}

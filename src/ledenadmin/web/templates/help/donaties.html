@@ -1,0 +1,11 @@
+<ul>
+  <li><a href="{{ org }}/donaties">Donaties</a> – registreer een donatie met lid, categorie, bedrag en datum.</li>
+  <li><strong>Online donaties</strong> via Mollie worden automatisch geboekt met de omschrijving “Online betaald (Mollie)”. Voer deze niet nogmaals handmatig in.</li>
+  <li>Filter op periode, lid of categorie; de infobalk toont het aantal en totaal van de gevonden donaties.</li>
+  {% if principal.can(Permission.DONATIONS_EDIT) %}
+  <li><strong>Bewerken</strong>: klik op het potlood achter een donatie (bij Donaties, op de pagina van een lid of in de Rapportage). Elke wijziging wordt met de oude en nieuwe waarde bewaard onder <em>Wijzigingsgeschiedenis</em>. Bij een online betaling liggen lid, bedrag en datum vast. Bij een donatie uit een voorbij jaar vraagt de app om bevestiging: eerder verstuurde jaaroverzichten kloppen daarna niet meer.</li>
+  <li>Een donatie die er niet had mogen zijn, verwijdert u bij Donaties; dit wordt vastgelegd in het logboek.</li>
+  {% else %}
+  <li>Een foutieve donatie laat u corrigeren of verwijderen door een beheerder.</li>
+  {% endif %}
+</ul>

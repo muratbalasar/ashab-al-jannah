@@ -51,6 +51,23 @@ class SecurityMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def safe_return_path(value: str, default: str = "/") -> str:
+    """Alleen paden binnen deze site, zodat een terug-link geen open redirect wordt.
+
+    Geweigerd: alles wat niet met precies één '/' begint ('//host' is een andere site),
+    backslashes en stuurtekens (browsers maken van '/\\host' of '/\\t/host' ook '//host').
+    """
+    if (
+        not value.startswith("/")
+        or value.startswith("//")
+        or "\\" in value
+        or any(ord(c) < 32 or ord(c) == 127 for c in value)
+    ):
+        return default
+    # Opbouwen met een vaste '/' ervoor, zodat ook statische analyse ziet dat dit lokaal blijft.
+    return "/" + value[1:]
+
+
 async def verify_csrf(request: Request) -> None:
     """Double-submit-controle voor formulieren en HTMX-verzoeken van de web-UI."""
     if request.method not in UNSAFE_METHODS:

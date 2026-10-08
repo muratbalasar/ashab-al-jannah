@@ -11,7 +11,7 @@
       <tr>
         {% if selectable %}<td class="select-col"><input type="checkbox" name="ids" value="{{ member.id }}" data-select-row aria-label="{{ member.name }} selecteren"></td>{% endif %}
         <td>{{ member.id }}</td>
-        <td><a href="/leden/{{ member.id }}">{{ member.name }}</a></td>
+        <td><a href="{{ org }}/leden/{{ member.id }}">{{ member.name }}</a></td>
         <td>{{ member.email }}</td>
         <td><span class="badge {{ member.status.value }}">{{ member.status.value | capitalize }}</span></td>
       </tr>
