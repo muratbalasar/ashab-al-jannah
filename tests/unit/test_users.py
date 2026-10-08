@@ -235,3 +235,20 @@ def test_dev_user_switch_is_unavailable_outside_dev_mode(client) -> None:
         update={"auth_mode": AuthMode.EASYAUTH}
     )
     assert client.get("/dev/gebruiker").status_code == 404
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("/o/x/donaties?a=1", "/o/x/donaties?a=1"),
+        ("//evil.example", "/"),
+        ("/\\evil.example", "/"),
+        ("/\t/evil.example", "/"),
+        ("https://evil.example", "/"),
+        ("", "/"),
+    ],
+)
+def test_safe_return_path(value, expected) -> None:
+    from ledenadmin.web.security import safe_return_path
+
+    assert safe_return_path(value) == expected

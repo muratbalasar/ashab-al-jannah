@@ -118,4 +118,5 @@ def legacy(request: Request, section: str, rest: str = "") -> Response:
         raise NotFoundError("Pagina niet gevonden")
     query = f"?{request.url.query}" if request.url.query else ""
     path = f"/{section}/{rest}" if rest else f"/{section}"
-    return RedirectResponse(f"/o/{DEFAULT_SLUG}{path}{query}", status_code=307)
+    # Vaste prefix met '+': het doel blijft altijd binnen deze site.
+    return RedirectResponse("/o/" + DEFAULT_SLUG + path + query, status_code=307)

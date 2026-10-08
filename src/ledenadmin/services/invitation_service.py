@@ -1,8 +1,8 @@
 """Uitnodigingen en rolbeheer binnen één organisatie."""
 
 import hashlib
-import re
 import secrets
+import string
 from dataclasses import dataclass
 from datetime import timedelta
 
@@ -16,11 +16,31 @@ from ledenadmin.domain.models import Invitation, Member, Membership, Organizatio
 
 INVITATION_VALIDITY = timedelta(days=7)
 INVALID_LINK = "Deze uitnodiging is ongeldig, verlopen of al gebruikt."
-# Domein met minstens één punt (vangt typefouten als 'naam@gmailcom'). Bewust geen
-# email-validator: die weigert ook lokale testadressen zoals 'naam@dev.local'.
-EMAIL_PATTERN = re.compile(
-    r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@([a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}"
-)
+_LOCAL_CHARS = frozenset(string.ascii_lowercase + string.digits + ".!#$%&'*+/=?^_`{|}~-")
+_LABEL_CHARS = frozenset(string.ascii_lowercase + string.digits + "-")
+
+
+def is_valid_email(email: str) -> bool:
+    """Eenvoudige controle in lineaire tijd (geen regex, dus geen ReDoS).
+
+    Het domein moet een punt hebben (vangt typefouten als 'naam@gmailcom'). Bewust geen
+    email-validator: die weigert ook lokale testadressen zoals 'naam@dev.local'.
+    """
+    if len(email) > 320 or email.count("@") != 1:
+        return False
+    local, domain = email.split("@")
+    if not local or not set(local) <= _LOCAL_CHARS:
+        return False
+    labels = domain.split(".")
+    if len(labels) < 2:
+        return False
+    for label in labels:
+        if not 0 < len(label) <= 63 or not set(label) <= _LABEL_CHARS:
+            return False
+        if label.startswith("-") or label.endswith("-"):
+            return False
+    top = labels[-1]
+    return len(top) >= 2 and top.isalpha()
 
 
 def hash_token(token: str) -> str:
@@ -52,7 +72,7 @@ class InvitationService:
         self, email: str, role: Role, actor: str, member_id: int | None = None
     ) -> CreatedInvitation:
         email = email.strip().lower()
-        if len(email) > 320 or not EMAIL_PATTERN.fullmatch(email):
+        if not is_valid_email(email):
             raise BusinessRuleError("Vul een geldig e-mailadres in", field="email")
         if role == Role.LID:
             if member_id is None:

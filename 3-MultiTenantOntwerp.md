@@ -367,7 +367,7 @@ Gevolgen:
 ### Na fase 7
 
 - **Database: SQLite met Litestream ✅** (besluit 5).
-  - De image bevat Litestream (versie en checksum vast in de `Dockerfile`); de ODBC-driver voor Azure SQL is verwijderd. De database staat in de container op `/data/ledenadmin.db`.
+  - De image bevat Litestream, gebouwd uit de broncode van de release-tag (commit vast in de `Dockerfile`) met bijgewerkte Go-modules, omdat de officiële binary bekende kwetsbaarheden bevat. De ODBC-driver voor Azure SQL is verwijderd. De database staat in de container op `/data/ledenadmin.db`.
   - `docker-entrypoint.sh`: met `LITESTREAM_REPLICA_URL` eerst `litestream restore` (alleen als er nog geen database is), daarna `litestream replicate -exec` met migraties en de app als subproces. Lukt het terugzetten niet, dan start de container niet.
   - Back-up naar Azure Blob Storage met de managed identity van de app (rol *Storage Blob Data Contributor*); dagelijkse snapshot, `LITESTREAM_RETENTION` standaard 7 dagen.
   - De app weigert in productie SQLite zonder `LITESTREAM_REPLICA_URL` (of expliciet `ALLOW_SQLITE_IN_PRODUCTION=true`).

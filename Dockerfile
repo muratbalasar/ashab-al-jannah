@@ -1,12 +1,23 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim
 
-# Litestream maakt continu een back-up van de SQLite-database naar Azure Blob Storage
-# (zie litestream.yml en docker-entrypoint.sh). Versie en checksums uit de GitHub-release.
+# Litestream maakt continu een back-up van de SQLite-database naar Azure Blob Storage (zie
+# litestream.yml en docker-entrypoint.sh). We bouwen de release-tag zelf: de officiële binary
+# bevat Go-modules met bekende kwetsbaarheden (Trivy). Alleen die modules worden bijgewerkt;
+# bij een nieuwe Litestream-release kan deze lijst kleiner worden of vervallen.
+FROM --platform=$BUILDPLATFORM golang:1.26 AS litestream
 ARG LITESTREAM_VERSION=0.5.17
-ARG LITESTREAM_SHA256_AMD64=cfb371176d164437ae869f8351cfde49bd1804ae71c61923f75c9cba9c9c006d
-ARG LITESTREAM_SHA256_ARM64=f8ca4a050095c1efbda2c4365172e61bf9d955ea0d9ac42f448b52e51819baa5
+ARG LITESTREAM_COMMIT=ccd326c175b583b5e82893a6078f06dcef5fba3f
 ARG TARGETARCH
+WORKDIR /src
+RUN git clone --quiet --depth 1 --branch "v${LITESTREAM_VERSION}" \
+        https://github.com/benbjohnson/litestream.git . \
+    && test "$(git rev-parse HEAD)" = "$LITESTREAM_COMMIT"
+RUN go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 google.golang.org/grpc@v1.84.0 \
+    && go mod tidy \
+    && CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH:-amd64}" go build -trimpath \
+        -ldflags "-s -w -X main.Version=${LITESTREAM_VERSION}" -o /out/litestream ./cmd/litestream
+
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,18 +29,8 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-RUN set -eu; \
-    case "${TARGETARCH:-amd64}" in \
-        amd64) asset=linux-x86_64; sum="$LITESTREAM_SHA256_AMD64" ;; \
-        arm64) asset=linux-arm64; sum="$LITESTREAM_SHA256_ARM64" ;; \
-        *) echo "Geen Litestream-build voor $TARGETARCH" >&2; exit 1 ;; \
-    esac; \
-    url="https://github.com/benbjohnson/litestream/releases/download/v${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-${asset}.tar.gz"; \
-    python -c "import sys, urllib.request; urllib.request.urlretrieve(sys.argv[1], '/tmp/litestream.tar.gz')" "$url"; \
-    echo "$sum  /tmp/litestream.tar.gz" | sha256sum -c -; \
-    tar -xzf /tmp/litestream.tar.gz -C /usr/local/bin litestream; \
-    rm /tmp/litestream.tar.gz; \
-    litestream version
+COPY --from=litestream /out/litestream /usr/local/bin/litestream
+RUN litestream version
 
 WORKDIR /app
 
