@@ -70,9 +70,21 @@ class Settings(BaseSettings):
     openai_base_url: str | None = None
     anthropic_api_key: str | None = None
 
+    # Helpassistent (US16): alleen actief met een externe AI-provider (zie assistant_active).
+    assistant_enabled: bool = False
+    assistant_daily_limit_per_user: int = Field(default=20, ge=1, le=100)
+    assistant_daily_limit_total: int = Field(default=300, ge=1, le=5000)
+    assistant_max_question_chars: int = Field(default=500, ge=50, le=1000)
+    assistant_max_output_tokens: int = Field(default=600, ge=100, le=1500)
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def assistant_active(self) -> bool:
+        """De assistent staat aan én er is een externe AI-provider; anders is hij onzichtbaar."""
+        return self.assistant_enabled and self.ai_provider != AIProviderName.LOCAL
 
     @property
     def superadmins(self) -> frozenset[str]:

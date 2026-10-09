@@ -324,6 +324,9 @@ jobs:
   #   LITESTREAM_REPLICA_URL – back-up van de SQLite-database, abs://<opslagaccount>@<container>/<pad>
   #   (de managed identity van de app heeft "Storage Blob Data Contributor"; zie README)
   # Optioneel: AI_PROVIDER, AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, ANTHROPIC_API_KEY
+  # Helpassistent (US16): ASSISTANT_ENABLED=true (vereist een externe AI_PROVIDER) en optioneel
+  #   ASSISTANT_DAILY_LIMIT_PER_USER, ASSISTANT_DAILY_LIMIT_TOTAL, ASSISTANT_MAX_QUESTION_CHARS,
+  #   ASSISTANT_MAX_OUTPUT_TOKENS; zie README "Helpassistent aanzetten".
   # Easy Auth (Entra ID) wordt eenmalig ingesteld; zie README "Deployment naar Azure".
   # ────────────────────────────────────────────────────────────────
   deploy-azure:
@@ -363,12 +366,49 @@ jobs:
           AI_PROVIDER: ${{ vars.AI_PROVIDER || 'local' }}
           AI_MODEL: ${{ vars.AI_MODEL }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          ASSISTANT_ENABLED: ${{ vars.ASSISTANT_ENABLED || 'false' }}
+          ASSISTANT_DAILY_LIMIT_PER_USER: ${{ vars.ASSISTANT_DAILY_LIMIT_PER_USER }}
+          ASSISTANT_DAILY_LIMIT_TOTAL: ${{ vars.ASSISTANT_DAILY_LIMIT_TOTAL }}
+          ASSISTANT_MAX_QUESTION_CHARS: ${{ vars.ASSISTANT_MAX_QUESTION_CHARS }}
+          ASSISTANT_MAX_OUTPUT_TOKENS: ${{ vars.ASSISTANT_MAX_OUTPUT_TOKENS }}
         run: |
           set -euo pipefail
           : "${LITESTREAM_REPLICA_URL:?Zet de variabele LITESTREAM_REPLICA_URL (zie README, Deployment)}"
+          # Controleer de AI-instellingen vóórdat de oude container stopt: met een fout start de
+          # nieuwe niet en is de app onbereikbaar.
+          case "$AI_PROVIDER" in
+            local) ;;
+            openai) : "${AI_MODEL:?AI_MODEL ontbreekt}" "${OPENAI_API_KEY:?Secret OPENAI_API_KEY ontbreekt}" ;;
+            anthropic) : "${AI_MODEL:?AI_MODEL ontbreekt}" "${ANTHROPIC_API_KEY:?Secret ANTHROPIC_API_KEY ontbreekt}" ;;
+            *) echo "::error::Onbekende AI_PROVIDER '$AI_PROVIDER' (local, openai of anthropic)"; exit 1 ;;
+          esac
+          ASSISTANT_ENABLED=$(echo "$ASSISTANT_ENABLED" | tr '[:upper:]' '[:lower:]')
+          if [ "$ASSISTANT_ENABLED" = "true" ] && [ "$AI_PROVIDER" = "local" ]; then
+            echo "::warning::ASSISTANT_ENABLED=true werkt alleen met AI_PROVIDER=openai of anthropic; de assistent blijft uit."
+          fi
+          # Ongeldige waarden laten de app niet starten: hier al weigeren (grenzen als in config.py).
+          case "$ASSISTANT_ENABLED" in
+            true|false) ;;
+            *) echo "::error::ASSISTANT_ENABLED moet true of false zijn (nu: '$ASSISTANT_ENABLED')"; exit 1 ;;
+          esac
+          check_range() {
+            local value="${!1}"
+            if [ -n "$value" ] && { ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt "$2" ] || [ "$value" -gt "$3" ]; }; then
+              echo "::error::$1 moet een geheel getal van $2 t/m $3 zijn (nu: '$value')"; exit 1
+            fi
+          }
+          check_range ASSISTANT_DAILY_LIMIT_PER_USER 1 100
+          check_range ASSISTANT_DAILY_LIMIT_TOTAL 1 5000
+          check_range ASSISTANT_MAX_QUESTION_CHARS 50 1000
+          check_range ASSISTANT_MAX_OUTPUT_TOKENS 100 1500
           ENV_VARS=(APP_ENV=production AUTH_MODE=easyauth
-                    LITESTREAM_REPLICA_URL="$LITESTREAM_REPLICA_URL" AI_PROVIDER="$AI_PROVIDER")
+                    LITESTREAM_REPLICA_URL="$LITESTREAM_REPLICA_URL" AI_PROVIDER="$AI_PROVIDER"
+                    ASSISTANT_ENABLED="$ASSISTANT_ENABLED")
           SECRETS=()
+          for NAME in ASSISTANT_DAILY_LIMIT_PER_USER ASSISTANT_DAILY_LIMIT_TOTAL \
+                      ASSISTANT_MAX_QUESTION_CHARS ASSISTANT_MAX_OUTPUT_TOKENS; do
+            if [ -n "${!NAME}" ]; then ENV_VARS+=("$NAME=${!NAME}"); fi
+          done
           if [ -n "$AI_MODEL" ]; then ENV_VARS+=(AI_MODEL="$AI_MODEL"); fi
           if [ -n "$OPENAI_BASE_URL" ]; then ENV_VARS+=(OPENAI_BASE_URL="$OPENAI_BASE_URL"); fi
           if [ -n "$OPENAI_API_KEY" ]; then

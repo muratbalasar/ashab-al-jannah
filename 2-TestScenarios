@@ -224,6 +224,41 @@ Feature: Platformbeheer, export en verwijderen (US15) – test_organization_data
     And worden na 30 dagen alle gegevens gewist
 
 
+Feature: Helpassistent (US16) – test_assistant.py
+
+  # test_assistant_is_invisible_and_unreachable_when_off, test_assistant_is_off_by_default_and_needs_external_provider
+  Scenario: Assistent staat uit
+    Given de assistent is niet aangezet of er is geen externe AI-dienst
+    When een gebruiker het menu en de Help bekijkt
+    Then ziet hij geen assistent
+    And geeft de pagina van de assistent "niet gevonden"
+
+  # test_answer_with_sources_from_the_given_knowledge_only, test_ask_via_htmx_returns_escaped_answer_fragment
+  Scenario: Vraag over de app
+    Given de assistent staat aan
+    When de gebruiker vraagt hoe hij een penningmeester uitnodigt
+    Then krijgt hij een kort antwoord met een link naar de Help
+    And ziet hij hoeveel vragen hij vandaag nog heeft
+
+  # test_off_topic_or_leaking_answers_are_refused
+  Scenario: Vraag buiten de app wordt geweigerd
+    When de gebruiker een vraag stelt die niet over de app gaat
+    Then krijgt hij de vaste melding dat de assistent alleen vragen over de app beantwoordt
+
+  # test_knowledge_follows_role_and_never_contains_member_data, test_only_redacted_question_is_sent, test_question_is_not_stored_in_the_audit_log
+  Scenario: Geen gegevens naar de AI-dienst
+    Given de stichting heeft leden en donaties
+    When een lid een vraag stelt met een e-mailadres erin
+    Then ontvangt de AI-dienst alleen de handleiding voor de rol lid en de vraag zonder e-mailadres
+    And staat de vraag niet in het logboek
+
+  # test_daily_limit_per_user, test_daily_limit_for_the_whole_platform
+  Scenario: Daglimiet
+    Given de gebruiker heeft het maximum aantal vragen van vandaag gesteld
+    When hij nog een vraag stelt
+    Then wordt de vraag niet verstuurd en hoort hij dat hij morgen weer kan vragen
+
+
 # ── Na de MVP (nog niet geautomatiseerd) ──────────────────────────────────────
 
 Feature: Boekhoudexport (US09)

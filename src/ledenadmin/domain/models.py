@@ -280,3 +280,18 @@ class MailCounter(Base):
 
     day: Mapped[str] = mapped_column(Unicode(10), primary_key=True)
     sent: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class AssistantUsage(Base):
+    """Aantal vragen aan de helpassistent per gebruiker per dag, voor de daglimieten.
+
+    Bewust zonder vraagtekst: er wordt alleen geteld.
+    """
+
+    __tablename__ = "assistant_usage"
+
+    day: Mapped[str] = mapped_column(Unicode(10), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    questions: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

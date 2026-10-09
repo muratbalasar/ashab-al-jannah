@@ -502,6 +502,15 @@ header + .report-section {
   white-space: pre-line;
 }
 
+/* ── Helpassistent ── */
+
+.assistant-answer > p:last-of-type {
+  margin-bottom: 0.5rem;
+}
+.assistant-remaining {
+  color: var(--pico-muted-color);
+}
+
 /* ── Datumvelden ── */
 
 .date-field {

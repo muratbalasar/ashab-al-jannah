@@ -1,6 +1,6 @@
 # User stories en acceptatiecriteria
 
-Deze stories beschrijven het MVP-gedrag (US01–US08), wat daarna is gebouwd (US11–US15) en
+Deze stories beschrijven het MVP-gedrag (US01–US08), wat daarna is gebouwd (US11–US16) en
 de geplande uitbreidingen (US09–US10). De scenario's staan in
 [`2-TestScenarios`](./2-TestScenarios); techniek en rollen staan in [`README.md`](./README.md)
 en het ontwerp voor meerdere stichtingen in [`3-MultiTenantOntwerp.md`](./3-MultiTenantOntwerp.md).
@@ -20,6 +20,7 @@ en het ontwerp voor meerdere stichtingen in [`3-MultiTenantOntwerp.md`](./3-Mult
 | US13 Mijn omgeving en online doneren | Gebouwd | `test_my.py`, `test_payments.py` |
 | US14 Donaties corrigeren | Gebouwd | `test_donation_edit.py` |
 | US15 Platformbeheer, export en verwijderen | Gebouwd | `test_organization_data.py`, `test_users.py` |
+| US16 Helpassistent | Gebouwd (standaard uit) | `test_assistant.py` |
 
 ## US01 - Leden beheren
 
@@ -239,3 +240,22 @@ alle gegevens van mijn stichting kunnen exporteren en verwijderen (AVG).
 - Een geblokkeerde stichting is voor haar gebruikers niet bereikbaar.
 - De beheerder exporteert alle eigen gegevens als ZIP (JSON en CSV).
 - Verwijderen is eerst 30 dagen omkeerbaar; daarna worden alle gegevens gewist.
+
+## US16 - Helpassistent
+
+Als gebruiker wil ik in de app een vraag kunnen stellen over het gebruik of de werking ervan,
+zodat ik snel een antwoord heb zonder de hele handleiding te lezen of de beheerder te storen.
+
+**Acceptatiecriteria**
+
+- De assistent staat standaard uit. Alleen als de platformbeheerder hem aanzet (met een externe
+  AI-dienst) is hij zichtbaar in het menu en in Help; anders is hij nergens te zien of te bereiken.
+- Hij beantwoordt alleen vragen over de app, op basis van de handleiding die bij de rol van de
+  gebruiker hoort. Andere vragen weigert hij met een vaste melding.
+- Er gaan geen gegevens van leden, donaties of de stichting naar de AI-dienst. E-mailadressen,
+  IBAN's en lange nummers in de vraag worden vóór verzending vervangen.
+- Vragen en antwoorden worden niet bewaard of gelogd; alleen het aantal wordt geteld.
+- Er is een daglimiet per gebruiker en voor het hele platform; de gebruiker ziet hoeveel vragen
+  hij nog heeft.
+- Bij elk antwoord staat dat het van een AI-assistent komt, met een link naar het deel van de Help
+  waarop het steunt.

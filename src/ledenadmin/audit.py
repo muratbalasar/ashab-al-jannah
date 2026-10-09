@@ -27,7 +27,8 @@ SESSION_COOKIE = "logboek_sessie"
 CLICK_SUFFIX = "/logboek/klik"
 CLIENT_ERROR_SUFFIX = "/logboek/fout"
 SKIP_PREFIXES = ("/static/", "/api/v1/health", "/favicon")
-SKIP_FIELDS = {"csrf_token"}
+# Nooit in het logboek: het CSRF-token en de vrije tekst van vragen aan de helpassistent.
+SKIP_FIELDS = {"csrf_token", "assistent_vraag"}
 MAX_DETAIL = 2000
 
 
