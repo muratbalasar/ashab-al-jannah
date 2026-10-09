@@ -6,6 +6,19 @@ mobiel, tablet of laptop. Registratie, rapportage en trendinzichten zitten in de
 Boekhoudkoppelingen en het inlezen van bankafschriften volgen later via de bestaande
 uitbreidingspunten.
 
+> [!TIP]
+> **🌐 Probeer de demo:**
+> **[ashab-al-jannah.blackmushroom-9f4102d8.westeurope.azurecontainerapps.io](https://ashab-al-jannah.blackmushroom-9f4102d8.westeurope.azurecontainerapps.io/)**
+>
+> 1. Kies op de inlogpagina **Geen account? Maak er een** en log in met een eenmalige code
+>    die je per e-mail krijgt.
+> 2. Klik op **Nieuwe stichting aanmaken**. Je bent meteen beheerder van je eigen
+>    demo-organisatie.
+> 3. Voeg leden, categorieën en donaties toe en bekijk de rapportage.
+>
+> Het is een demo: gebruik geen echte persoonsgegevens. De eerste keer laden kan 30–60
+> seconden duren, omdat de app opstart als hij een tijd niet gebruikt is.
+
 | Document | Inhoud |
 |---|---|
 | [1-UserStories](./1-UserStories.md) | User stories en acceptatiecriteria (US01–US10) |
