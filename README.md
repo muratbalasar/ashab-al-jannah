@@ -10,7 +10,66 @@ uitbreidingspunten.
 |---|---|
 | [1-UserStories](./1-UserStories.md) | User stories en acceptatiecriteria (US01–US10) |
 | [2-TestScenarios](./2-TestScenarios) | Gherkin-scenario's, 1-op-1 geautomatiseerd in [tests/functional](./tests/functional) |
+| [3-MultiTenantOntwerp](./3-MultiTenantOntwerp.md) | Ontwerp voor meerdere stichtingen, hosting en kosten |
+| [4-EntraExternalID](./4-EntraExternalID.md) | Inloggen met Entra External ID (Google, Microsoft, e-mailcode) en Easy Auth |
 | [.env.example](./.env.example) | Alle configuratie-instellingen |
+| [ci-cd.yml](./.github/workflows/ci-cd.yml) | CI/CD-workflow: tests, scans, image en deploy naar Azure |
+| [LICENSE](./LICENSE.md) | PolyForm Noncommercial License 1.0.0 |
+
+## Inhoud
+
+- [Over de naam](#over-de-naam)
+- [Snel starten (lokaal)](#snel-starten-lokaal)
+  - [Optie A – Met Python en `start.ps1`](#optie-a--met-python-en-startps1)
+    - [Lokaal en multi-tenant](#lokaal-en-multi-tenant)
+    - [Platformbeheer en meerdere organisaties lokaal testen](#platformbeheer-en-meerdere-organisaties-lokaal-testen)
+    - [Demo met Playwright](#demo-met-playwright)
+  - [Optie B – Container-image met Docker (Windows en Linux)](#optie-b--container-image-met-docker-windows-en-linux)
+    - [Docker installeren](#docker-installeren)
+    - [B1 – Kant-en-klare image van GitHub (zonder clonen)](#b1--kant-en-klare-image-van-github-zonder-clonen)
+    - [B2 – Zelf bouwen vanuit de broncode](#b2--zelf-bouwen-vanuit-de-broncode)
+    - [Waar staan de gegevens?](#waar-staan-de-gegevens)
+- [Techstack](#techstack)
+- [Architectuur](#architectuur)
+  - [Softwarelagen](#softwarelagen)
+  - [Deploymentmodel (infrastructuur)](#deploymentmodel-infrastructuur)
+  - [Back-up en herstel (sequence)](#back-up-en-herstel-sequence)
+  - [Inloggen en autorisatie (sequence)](#inloggen-en-autorisatie-sequence)
+- [Gebruikers en autorisatie](#gebruikers-en-autorisatie)
+  - [Superadmin (platformbeheer)](#superadmin-platformbeheer)
+  - [Ledenvelden](#ledenvelden)
+  - [Logboek](#logboek)
+- [Functionele requirements](#functionele-requirements)
+  - [Leden (US01)](#leden-us01)
+  - [Donaties (US02)](#donaties-us02)
+  - [Categorieën beheren](#categorieën-beheren)
+  - [Rapportage (US04–US06)](#rapportage-us04us06)
+  - [AI-inzichten (US07)](#ai-inzichten-us07)
+- [Niet-functionele requirements](#niet-functionele-requirements)
+- [Configuratie](#configuratie)
+  - [Checklist productie (alle fases)](#checklist-productie-alle-fases)
+- [Tests en kwaliteit](#tests-en-kwaliteit)
+- [Deployment naar Azure](#deployment-naar-azure)
+  - [Eerste deployment stap voor stap](#eerste-deployment-stap-voor-stap)
+    - [Stap 0 – Variabelen vastleggen](#stap-0--variabelen-vastleggen-cloud-shell)
+    - [Stap 1 – Resource group](#stap-1--resource-group-cloud-shell)
+    - [Stap 2 – Resource providers registreren](#stap-2--resource-providers-registreren-cloud-shell)
+    - [Stap 3 – Opslag voor de back-up](#stap-3--opslag-voor-de-back-up-cloud-shell)
+    - [Stap 4 – GitHub laat inloggen bij Azure met OIDC](#stap-4--github-laat-inloggen-bij-azure-met-oidc-cloud-shell)
+    - [Stap 5 – Secrets en variabele in GitHub](#stap-5--secrets-en-variabele-in-github-powershell-op-je-pc--browser)
+    - [Stap 6 – Eerste deploy](#stap-6--eerste-deploy-powershell-op-je-pc)
+    - [Stap 7 – App toegang geven tot de opslag](#stap-7--app-toegang-geven-tot-de-opslag-cloud-shell)
+    - [Stap 8 – Inloggen met Entra External ID (Easy Auth)](#stap-8--inloggen-met-entra-external-id-easy-auth)
+      (achtergrond: [4-EntraExternalID](./4-EntraExternalID.md))
+    - [Stap 9 – Jezelf superadmin maken](#stap-9--jezelf-superadmin-maken-cloud-shell)
+  - [Instellingen later wijzigen](#instellingen-later-wijzigen)
+  - [Troubleshooting deployment](#troubleshooting-deployment)
+  - [Back-up en herstel](#back-up-en-herstel)
+  - [Overstap van Azure SQL](#overstap-van-azure-sql)
+- [Uitbreidingen na de MVP](#uitbreidingen-na-de-mvp)
+- [Open besluiten](#open-besluiten)
+- [Licentie](#licentie)
+- [Online doneren (Mollie)](#online-doneren-mollie)
 
 ## Over de naam
 
@@ -320,6 +379,210 @@ Principes:
 - **Tekst** is Unicode (`NVARCHAR` op SQL Server), zodat namen als "Ayşe Öztürk" correct
   blijven.
 
+De diagrammen hieronder zijn in [Mermaid](https://mermaid.js.org); GitHub en VS Code (met een
+Mermaid-extensie) tonen ze als afbeelding.
+
+### Softwarelagen
+
+Elke request gaat van boven naar beneden door dezelfde lagen. Web-UI en REST API delen
+de services; alleen de bovenste laag verschilt. De tenancy-laag zorgt dat elke query
+automatisch gefilterd wordt op de organisatie uit het pad (`/o/{org}/...`).
+
+```mermaid
+flowchart TB
+    subgraph Clients["Clients"]
+        Browser["Browser<br/>Jinja2-pagina's + HTMX + Chart.js"]
+        ApiClient["API-client<br/>REST /api/v1 (OpenAPI)"]
+    end
+
+    EasyAuth["Easy Auth (Azure-platform)<br/>inloggen, zet X-MS-CLIENT-PRINCIPAL"]
+
+    subgraph App["FastAPI-app (src/ledenadmin)"]
+        direction TB
+        MW["Middleware<br/>SecurityMiddleware: CSP, CSRF, secure cookies<br/>AuditMiddleware: logboek, foutcodes"]
+        subgraph Routes["Routes: invoer valideren, vertalen naar HTTP"]
+            direction LR
+            Web["web/<br/>pagina's /o/{org}/..."]
+            Api["api/<br/>REST /o/{org}/api/v1"]
+            Platform["web/platform.py<br/>/platform (superadmin)"]
+            Webhook["web/payments.py<br/>Mollie-webhook"]
+        end
+        Deps["api/deps.py + auth/<br/>AuthProvider → Identity → Principal<br/>organisatie uit pad, rollen, rechten"]
+        Services["services/ via ServiceContainer<br/>leden, donaties, categorieën, rapportage,<br/>gebruikers, organisaties, betalingen, mail, KVK"]
+        Ports["Uitbreidingspunten (adapters)<br/>InsightProvider (AI), ReportExporter (CSV),<br/>mail (Brevo), Mollie, KVK"]
+        Repos["repositories/<br/>data-toegang per aggregaat"]
+        Domain["domain/ + tenancy.py<br/>ORM-modellen, rollen/rechten, geld in centen,<br/>automatisch filter op organization_id"]
+        DB["db.py<br/>SQLAlchemy 2, UTC-tijden, SQLite in WAL-modus"]
+    end
+
+    SQLite[("SQLite<br/>/data/ledenadmin.db")]
+    Ext["Externe diensten<br/>OpenAI/Anthropic, Mollie, Brevo, KVK"]
+
+    Browser --> EasyAuth
+    ApiClient --> EasyAuth
+    EasyAuth --> MW --> Routes
+    Routes --> Deps
+    Routes --> Services
+    Services --> Repos --> Domain --> DB --> SQLite
+    Services --> Ports --> Ext
+```
+
+### Deploymentmodel (infrastructuur)
+
+Eén container in Azure Container Apps, met de database op de eigen schijf en een continue
+back-up naar Blob Storage. Inloggen gebeurt bij een aparte Entra External ID-tenant. Inrichten:
+zie [Eerste deployment stap voor stap](#eerste-deployment-stap-voor-stap).
+
+**Runtime**: wat draait er en hoe lopen requests en gegevens.
+
+```mermaid
+flowchart TB
+    User["Gebruiker<br/>browser"]
+
+    subgraph ExtId["Entra External ID: tenant ashab-login"]
+        Flow["User flow signup_signin<br/>e-mailcode, later Google/Facebook"]
+        LoginApp["App-registratie Ashab al-Jannah"]
+        Flow --- LoginApp
+    end
+
+    subgraph Azure["Azure: resource group rg-ashab-al-jannah (westeurope)"]
+        subgraph CAE["Container Apps-omgeving cae-ashab-al-jannah"]
+            subgraph CA["Container App ashab-al-jannah: 0-1 replica, 0,5 vCPU, 1 GiB"]
+                Ingress["HTTPS-ingress<br/>+ Easy Auth"]
+                Container["Container<br/>Litestream + uvicorn/FastAPI"]
+                Disk[("Lokale schijf<br/>/data/ledenadmin.db")]
+            end
+        end
+        LA["Log Analytics<br/>app- en systeemlogs"]
+        MI{{"Managed identity<br/>Storage Blob Data Contributor"}}
+        SA[("Storage account<br/>container ledenadmin<br/>back-up + 14 dagen soft delete")]
+    end
+
+    Partners["Externe diensten<br/>Mollie, Brevo, KVK, AI-provider"]
+
+    User -->|HTTPS| Ingress
+    Ingress <-->|niet ingelogd: inloggen| Flow
+    Ingress -->|ingelogd: request + claims| Container
+    Container --> Disk
+    Container -->|back-up, ± 1 s| MI --> SA
+    Container --> Partners
+    CA -.->|logs| LA
+```
+
+**Levering (CI/CD)**: GitHub bouwt en test het image en deployt zonder wachtwoord (OIDC).
+
+```mermaid
+flowchart LR
+    subgraph GitHub["GitHub"]
+        Repo["Repository"] -->|push of Run workflow| Actions["GitHub Actions<br/>ci-cd.yml"]
+        Actions -->|tests en scans geslaagd:<br/>image pushen| GHCR[("ghcr.io<br/>container-image")]
+    end
+
+    subgraph Entra["Entra ID: eigen tenant"]
+        GhApp["App-registratie github-ashab-al-jannah<br/>federated credential (OIDC)"]
+    end
+
+    subgraph Azure["Azure: rg-ashab-al-jannah"]
+        CA["Container App<br/>ashab-al-jannah"]
+    end
+
+    Actions -->|1. OIDC-token, geen wachtwoord| GhApp
+    GhApp -.->|rol Contributor op de resource group| Azure
+    Actions -->|2. oude revision stoppen,<br/>az containerapp update| CA
+    CA -->|3. image ophalen met GHCR_PULL_TOKEN| GHCR
+```
+
+### Back-up en herstel (sequence)
+
+[docker-entrypoint.sh](./docker-entrypoint.sh) zet bij elke start de database terug uit Blob
+Storage en start de app als subproces van Litestream. Litestream stuurt elke wijziging binnen
+ongeveer een seconde naar de opslag. Bij een nieuwe versie stopt de workflow eerst de oude
+container (blok *Stoppen*) en start daarna de nieuwe (blok *Opstarten*), zodat er nooit twee
+schrijvers zijn. Zie ook [Back-up en herstel](#back-up-en-herstel).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant ACA as Azure Container Apps
+    participant EP as docker-entrypoint.sh
+    participant LS as Litestream
+    participant App as uvicorn + FastAPI
+    participant DB as SQLite /data
+    participant Blob as Blob Storage
+
+    Note over ACA,Blob: Opstarten: eerste request na scale-to-zero, herstart of nieuwe versie
+    ACA->>EP: container starten (schijf is leeg)
+    EP->>LS: litestream restore -if-db-not-exists -if-replica-exists
+    LS->>Blob: laatste snapshot + WAL ophalen (managed identity)
+    alt back-up bereikbaar
+        Blob-->>LS: gegevens
+        LS->>DB: database terugzetten
+        EP->>LS: litestream replicate -exec serve
+        LS->>App: start subproces: alembic upgrade head, dan uvicorn
+    else geen toegang tot de opslag
+        Blob-->>LS: geweigerd
+        LS-->>EP: fout
+        EP-->>ACA: container stopt: nooit een lege database als nieuwe back-up
+    end
+
+    Note over ACA,Blob: Tijdens gebruik
+    loop elke wijziging
+        App->>DB: schrijven (WAL)
+        LS->>DB: nieuwe WAL-frames lezen
+        LS->>Blob: binnen ongeveer 1 s repliceren
+    end
+    LS->>Blob: elke 24 uur een volledige snapshot, ouder dan LITESTREAM_RETENTION opruimen
+
+    Note over ACA,Blob: Stoppen: scale-to-zero of nieuwe versie
+    ACA->>LS: SIGTERM
+    LS->>App: app stoppen
+    LS->>Blob: laatste synchronisatie
+    LS-->>ACA: container gestopt
+```
+
+### Inloggen en autorisatie (sequence)
+
+De app heeft geen eigen wachtwoorden. Easy Auth regelt het inloggen bij Entra External ID en
+geeft de claims door in de header `X-MS-CLIENT-PRINCIPAL`; het platform overschrijft die
+header bij elke request, zodat een client hem niet kan vervalsen. De app herkent een gebruiker
+aan *issuer + subject* en haalt de rollen per organisatie uit de database. Zie ook
+[4-EntraExternalID.md](./4-EntraExternalID.md) en [Gebruikers en autorisatie](#gebruikers-en-autorisatie).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Gebruiker (browser)
+    participant EA as Easy Auth (ingress)
+    participant CIAM as Entra External ID (ciamlogin.com)
+    participant App as FastAPI-app
+    participant DB as SQLite
+
+    U->>EA: GET /o/stichting/... zonder sessiecookie
+    EA-->>U: 302 naar /.auth/login/aad en door naar CIAM
+    U->>CIAM: authorize via user flow signup_signin
+    CIAM-->>U: e-mailadres vragen en eenmalige code mailen
+    U->>CIAM: code invoeren (eerste keer: account aanmaken + weergavenaam)
+    CIAM-->>U: 302 naar /.auth/login/aad/callback met code + id_token
+    U->>EA: callback
+    EA->>CIAM: token valideren (issuer, client-id, client secret)
+    EA-->>U: sessiecookie + 302 naar de oorspronkelijke pagina
+
+    U->>EA: GET /o/stichting/... met sessiecookie
+    EA->>App: request + X-MS-CLIENT-PRINCIPAL (claims)
+    App->>App: EasyAuthProvider maakt Identity: issuer + subject (oid of sub), naam, e-mail (alleen als geverifieerd)
+    App->>DB: UserService.upsert: gebruiker vastleggen of bijwerken
+    App->>DB: organisatie uit het pad, rollen uit memberships
+    App->>App: Principal met rechten, superadmin als issuer + subject in SUPERADMIN_SUBJECTS staat
+    alt geen rol in deze organisatie, of organisatie onbekend of geblokkeerd
+        App-->>U: 404 Organisatie niet gevonden
+    else rol aanwezig, maar recht ontbreekt
+        App-->>U: 403
+    else recht aanwezig
+        App-->>U: 200 pagina, alleen gegevens van deze organisatie
+    end
+    Note over EA,App: /api/v1/health is uitgezonderd en werkt zonder inloggen. Lokaal (AUTH_MODE=dev) vervangt DevAuthProvider Easy Auth.
+```
+
 ## Gebruikers en autorisatie
 
 | Recht | Beheerder | Penningmeester | Bestuurder | Lid |
@@ -346,6 +609,42 @@ rapporten zonder uitsplitsing per lid en zonder losse donaties. Een lid ziet all
 gekoppelde ledenrecord en jaaroverzicht op *Mijn omgeving*; het lid kan geen organisatiebrede
 rapportages of gegevens van andere leden inzien. Deze verdeling is een startpunt dat met het
 bestuur moet worden bevestigd.
+
+### Superadmin (platformbeheer)
+
+De rollen hierboven gelden **per organisatie** en staan in de database (`memberships`). De
+superadmin is daarnaast een **platformrol** voor wie de installatie beheert. Die rol staat niet
+in de database maar in de instelling `SUPERADMIN_SUBJECTS`. Daarin staan een of meer
+gebruikers als `issuer|subject`, gescheiden door komma's. Een superadmin hoeft dus geen lid te
+zijn van een organisatie.
+
+| Superadmin | Kan | Kan niet |
+|---|---|---|
+| `/platform` | Overzicht van alle organisaties: KVK, plaats, aantal gebruikers en leden, laatste activiteit, status; totalen en het aantal fouten in de laatste 24 uur | |
+| Organisaties | **Blokkeren** en **deblokkeren**: een geblokkeerde organisatie geeft voor iedereen een 404. Een door de beheerder verwijderde organisatie **herstellen** of **nu wissen** (anders wordt ze na de wachttijd automatisch gewist) | Zelf een organisatie verwijderen; dat doet de beheerder in *Instellingen* |
+| Gegevens van organisaties | | Leden, donaties, rapporten of het logboek van een organisatie inzien zonder daar een rol te hebben: `/o/<slug>/...` geeft een 404 (privacy) |
+| Meldingen | Krijgt een mail bij elke nieuwe organisatie op `SUPERADMIN_EMAIL` (alleen als e-mail via Brevo is ingesteld) | |
+
+Werking:
+
+- **Instellen**: in productie zie
+  [Stap 9 – Jezelf superadmin maken](#stap-9--jezelf-superadmin-maken-cloud-shell); lokaal
+  `SUPERADMIN_SUBJECTS=dev|ontwikkelaar` (zie
+  [Platformbeheer en meerdere organisaties lokaal testen](#platformbeheer-en-meerdere-organisaties-lokaal-testen)).
+- **Herkenning**: bij elke request vergelijkt de app de `issuer|subject` van de ingelogde
+  gebruiker met `SUPERADMIN_SUBJECTS` (`UserService.is_superadmin`). De routes onder
+  `/platform` eisen dit server-side (`require_superadmin` in
+  [deps.py](./src/ledenadmin/api/deps.py)); anders volgt een 403.
+- **Menu**: een superadmin ziet het menu-item **Platform** en onder **Help** het onderdeel
+  *Platformbeheer (superadmin)*. Heeft hij nog geen organisatie, dan stuurt `/` hem direct door
+  naar `/platform`.
+- **Combineren**: wil een superadmin ook in een organisatie werken, dan laat hij zich daar
+  uitnodigen of maakt hij zelf een organisatie aan. Hij krijgt dan de gewone rol in die
+  organisatie, los van het platformbeheer.
+- **Wijzigen of intrekken**: pas `SUPERADMIN_SUBJECTS` aan volgens
+  [Instellingen later wijzigen](#instellingen-later-wijzigen). Wie inlogt met een andere
+  provider (bijv. Google in plaats van een e-mailcode), heeft een ander `issuer|subject` en is
+  dus niet automatisch superadmin.
 
 ### Ledenvelden
 
@@ -539,55 +838,469 @@ en security-tests:
 Op `main` wordt het image pas naar ghcr.io gepusht als alle tests en scans slagen.
 Deployen gebeurt handmatig via *Run workflow* met `deploy_azure`.
 
-Voor de eerste deployment zijn deze eenmalige stappen nodig:
-
-1. **Opslag voor de back-up** (Azure Blob Storage, een paar cent per maand):
-
-   ```bash
-   az storage account create -n <opslagaccount> -g rg-ashab-al-jannah -l westeurope \
-     --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 --allow-blob-public-access false
-   az storage container create --account-name <opslagaccount> -n ledenadmin --auth-mode login
-   # Extra vangnet: verwijderde back-upbestanden blijven 14 dagen terug te halen.
-   az storage account blob-service-properties update --account-name <opslagaccount> \
-     -g rg-ashab-al-jannah --enable-delete-retention true --delete-retention-days 14
-   ```
-
-2. **GitHub OIDC**: maak een app-registratie met een federated credential voor
-   environment `production` en geef die Contributor op de resource group. Zet
-   `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` en `AZURE_SUBSCRIPTION_ID` als secrets.
-3. **Secret en variabele** (environment `production`): secret `GHCR_PULL_TOKEN` (PAT met
-   alleen `read:packages`) en variabele `LITESTREAM_REPLICA_URL`, bijvoorbeeld
-   `abs://<opslagaccount>@ledenadmin/ledenadmin`.
-4. **Toegang tot de opslag voor de app** (na de eerste deploy; tot dan start de container
-   niet, omdat Litestream de back-up niet kan lezen). De app meldt zich aan met haar
-   managed identity, dus er is geen opslagsleutel nodig:
-
-   ```bash
-   PRINCIPAL=$(az containerapp show -n ashab-al-jannah -g rg-ashab-al-jannah --query identity.principalId -o tsv)
-   SCOPE=$(az storage account show -n <opslagaccount> -g rg-ashab-al-jannah --query id -o tsv)/blobServices/default/containers/ledenadmin
-   az role assignment create --assignee-object-id "$PRINCIPAL" --assignee-principal-type ServicePrincipal \
-     --role "Storage Blob Data Contributor" --scope "$SCOPE"
-   az containerapp revision restart -n ashab-al-jannah -g rg-ashab-al-jannah \
-     --revision $(az containerapp revision list -n ashab-al-jannah -g rg-ashab-al-jannah --query "[0].name" -o tsv)
-   ```
-
-5. **Aanmelden (Easy Auth)**: zie [4-EntraExternalID.md](4-EntraExternalID.md). Vereis
-   aanmelding en sluit alleen de health-check uit:
-
-   ```bash
-   az containerapp auth update -n ashab-al-jannah -g rg-ashab-al-jannah \
-     --unauthenticated-client-action RedirectToLoginPage --excluded-paths /api/v1/health
-   ```
-
 Aandachtspunten:
 - Er draait **altijd precies één container** (`maxReplicas=1`): twee containers die dezelfde
   database en back-up beschrijven, maken de gegevens kapot. Bij een nieuwe versie stopt de
   workflow daarom eerst de oude container en start dan de nieuwe; de app is dan enkele
-  seconden onbereikbaar.
+  seconden onbereikbaar. Wijzig je zelf instellingen, volg dan
+  [Instellingen later wijzigen](#instellingen-later-wijzigen).
 - Door scale-to-zero duurt de eerste request na een stille periode een paar seconden: de
   container start en Litestream zet de database terug. Migraties draaien daarna bij het
   opstarten (`RUN_MIGRATIONS=true`).
 - Controleer vóór ingebruikname de actuele limieten, kosten en regio van de gratis tegoeden.
+
+### Eerste deployment stap voor stap
+
+Eenmalig, reken op ongeveer een uur, waarvan een kwartier wachten op Azure. Je werkt op drie
+plekken:
+
+| Waar | Waarvoor |
+|---|---|
+| **Cloud Shell (Bash)** in [portal.azure.com](https://portal.azure.com) (knop `>_` bovenin) | Alle `az`-commando's; de Azure CLI is daar al aangemeld |
+| **PowerShell op je eigen pc** met de [GitHub CLI](https://cli.github.com) (`gh auth login`) | Secrets, variabelen en de workflow in GitHub |
+| **Portal** ([entra.microsoft.com](https://entra.microsoft.com)) | Alleen de externe tenant en de user flow (stap 8a en 8c) |
+
+Je hebt een Azure-abonnement nodig waarop je **Owner** bent; Contributor is niet genoeg,
+want in stap 4 en 7 wijs je rollen toe.
+
+| Stap | Wat | Waar |
+|---|---|---|
+| 0 | Variabelen vastleggen | Cloud Shell |
+| 1 | Resource group | Cloud Shell |
+| 2 | Resource providers registreren | Cloud Shell |
+| 3 | Opslag voor de back-up | Cloud Shell |
+| 4 | GitHub laat inloggen bij Azure (OIDC) | Cloud Shell |
+| 5 | Secrets en variabele in GitHub | PowerShell + browser |
+| 6 | Eerste deploy | PowerShell |
+| 7 | App toegang geven tot de opslag | Cloud Shell |
+| 8 | Inloggen met Entra External ID (Easy Auth) | Portal + Cloud Shell + browser |
+| 9 | Jezelf superadmin maken | Cloud Shell + browser |
+
+#### Stap 0 – Variabelen vastleggen (Cloud Shell)
+
+Variabelen in Cloud Shell verdwijnen als de browser herlaadt; je home-map blijft wel
+bewaard. Daarom staan alle niet-geheime waarden in `~/ashab.env`. Begin elke nieuwe
+Cloud Shell-sessie met `source ~/ashab.env`.
+
+Kies een naam voor het opslagaccount: wereldwijd uniek, 3–24 kleine letters of cijfers.
+
+```bash
+az storage account check-name -n <opslagaccount> --query nameAvailable   # moet true zijn
+
+cat > ~/ashab.env <<EOF
+RG=rg-ashab-al-jannah
+LOC=westeurope
+APPNAME=ashab-al-jannah
+SA=<opslagaccount>
+GH_REPO=<github-eigenaar>/ashab-al-jannah
+SUB=$(az account show --query id -o tsv)
+TENANT=$(az account show --query tenantId -o tsv)
+EOF
+source ~/ashab.env; cat ~/ashab.env
+```
+
+**Controle:** `cat` toont alle waarden ingevuld. Klopt `SUB` niet (meerdere abonnementen),
+kies dan eerst het juiste met `az account set --subscription <naam-of-id>` en maak het bestand
+opnieuw. `RG`, `LOC` en `APPNAME` moeten gelijk zijn aan de `env:`-waarden in
+[ci-cd.yml](./.github/workflows/ci-cd.yml).
+
+#### Stap 1 – Resource group (Cloud Shell)
+
+Eén map voor alle onderdelen; de GitHub-identiteit krijgt straks alleen rechten hierop.
+
+```bash
+az group create -n $RG -l $LOC --tags project=ashab-al-jannah
+```
+
+**Controle:** `az group show -n $RG --query properties.provisioningState -o tsv` → `Succeeded`.
+
+#### Stap 2 – Resource providers registreren (Cloud Shell)
+
+Eenmalig per abonnement. Dit moet met jouw Owner-account: de GitHub-identiteit heeft alleen
+rechten op de resource group en kan dit zelf niet (anders faalt de deploy op het aanmaken van
+de Container Apps-omgeving).
+
+```bash
+for P in Microsoft.App Microsoft.OperationalInsights Microsoft.Storage; do
+  az provider register -n $P --wait
+done
+```
+
+**Controle:** alle drie `Registered`:
+
+```bash
+az provider list --query "[?namespace=='Microsoft.App' || namespace=='Microsoft.OperationalInsights' || namespace=='Microsoft.Storage'].{ns:namespace, state:registrationState}" -o table
+```
+
+#### Stap 3 – Opslag voor de back-up (Cloud Shell)
+
+Litestream schrijft hier continu een kopie van de SQLite-database naartoe (een paar cent per
+maand). Zonder bereikbare back-up start de app in productie niet.
+
+```bash
+az storage account create -n $SA -g $RG -l $LOC \
+  --sku Standard_LRS --kind StorageV2 --min-tls-version TLS1_2 --allow-blob-public-access false
+az storage container-rm create --storage-account $SA -g $RG -n ledenadmin
+# Extra vangnet: verwijderde back-upbestanden blijven 14 dagen terug te halen.
+az storage account blob-service-properties update --account-name $SA -g $RG \
+  --enable-delete-retention true --delete-retention-days 14
+```
+
+`container-rm create` loopt via Azure Resource Manager. Gebruik niet
+`az storage container create --auth-mode login`: als Owner heb je geen rechten op de
+blobgegevens zelf (*AuthorizationFailure*).
+
+**Controle:** `az storage container-rm list --storage-account $SA -g $RG --query "[].name" -o tsv`
+→ `ledenadmin`.
+
+#### Stap 4 – GitHub laat inloggen bij Azure met OIDC (Cloud Shell)
+
+De workflow meldt zich zonder wachtwoord aan bij Azure: Entra vertrouwt een token van GitHub
+Actions, maar alleen voor deze repo en de environment `production`.
+
+GitHub zet in dat token een *subject* met de numerieke id's van eigenaar en repo
+(`repo:<eigenaar>@<eigenaar-id>/<repo>@<repo-id>:environment:production`). Het subject in Entra
+moet daar letterlijk mee overeenkomen. Haal de id's op:
+
+```bash
+read OWNER_ID REPO_ID < <(curl -s https://api.github.com/repos/$GH_REPO | jq -r '"\(.owner.id) \(.id)"')
+OWNER=${GH_REPO%%/*}; REPO=${GH_REPO##*/}
+SUBJECT="repo:$OWNER@$OWNER_ID/$REPO@$REPO_ID:environment:production"; echo $SUBJECT
+```
+
+App-registratie, federated credential en de rol Contributor op alleen de resource group:
+
+```bash
+APP=$(az ad app create --display-name github-ashab-al-jannah --query appId -o tsv)
+SP=$(az ad sp create --id $APP --query id -o tsv)
+echo "GITHUB_APP=$APP" >> ~/ashab.env
+
+az ad app federated-credential create --id $APP --parameters "{
+  \"name\": \"github-production\",
+  \"issuer\": \"https://token.actions.githubusercontent.com\",
+  \"subject\": \"$SUBJECT\",
+  \"audiences\": [\"api://AzureADTokenExchange\"]
+}"
+
+az role assignment create --assignee-object-id $SP --assignee-principal-type ServicePrincipal \
+  --role Contributor --scope $(az group show -n $RG --query id -o tsv)
+
+echo "AZURE_CLIENT_ID=$APP"; echo "AZURE_TENANT_ID=$TENANT"; echo "AZURE_SUBSCRIPTION_ID=$SUB"
+```
+
+Noteer de drie waarden van de laatste regel voor stap 5 (dit zijn id's, geen wachtwoorden;
+zet ze toch niet in de code).
+
+**Controle:**
+
+```bash
+az ad app federated-credential list --id $APP --query "[].subject" -o tsv
+az role assignment list --assignee $SP --all --query "[].{rol:roleDefinitionName, scope:scope}" -o table
+```
+
+Je ziet je `$SUBJECT` en één regel `Contributor` met scope `.../resourceGroups/rg-ashab-al-jannah`.
+
+#### Stap 5 – Secrets en variabele in GitHub (PowerShell op je pc + browser)
+
+De deploy-job leest deze waarden uit de environment `production`. De workflow haalt het
+image van ghcr.io; daarvoor heeft Azure een token met alleen leesrechten nodig.
+
+```powershell
+cd <map-van-de-repo>
+gh api -X PUT repos/<github-eigenaar>/ashab-al-jannah/environments/production
+
+gh secret set AZURE_CLIENT_ID       --env production --body "<AZURE_CLIENT_ID>"
+gh secret set AZURE_TENANT_ID       --env production --body "<AZURE_TENANT_ID>"
+gh secret set AZURE_SUBSCRIPTION_ID --env production --body "<AZURE_SUBSCRIPTION_ID>"
+gh variable set LITESTREAM_REPLICA_URL --env production --body "abs://<opslagaccount>@ledenadmin/ledenadmin"
+```
+
+**GHCR_PULL_TOKEN** (in de browser): open
+[github.com/settings/tokens/new](https://github.com/settings/tokens/new) (*classic* token),
+note `ghcr-pull-azure`, kies een vervaldatum en vink **alleen `read:packages`** aan. Kopieer de
+token en sla hem op; `gh` vraagt zelf om de waarde, zodat hij niet in je
+PowerShell-geschiedenis komt:
+
+```powershell
+gh secret set GHCR_PULL_TOKEN --env production
+```
+
+Optioneel (AI): variabelen `AI_PROVIDER`, `AI_MODEL`, `OPENAI_BASE_URL` en secrets
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY` op dezelfde manier.
+
+**Controle:**
+
+```powershell
+gh secret list --env production     # AZURE_CLIENT_ID, AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, GHCR_PULL_TOKEN
+gh variable list --env production   # LITESTREAM_REPLICA_URL
+```
+
+#### Stap 6 – Eerste deploy (PowerShell op je pc)
+
+De workflow draait alle tests en scans, pusht het image naar ghcr.io, maakt de Container
+Apps-omgeving en de Container App aan en doet een rooktest op de live URL. Zorg dat je code
+op `main` staat (`git status` → gelijk aan `origin/main`).
+
+```powershell
+gh workflow run ci-cd.yml --ref main -f deploy_azure=true
+Start-Sleep 5
+$RUN = gh run list --workflow ci-cd.yml -L 1 --json databaseId -q '.[0].databaseId'
+gh run watch $RUN
+```
+
+Duur: 10–20 minuten voor tests en image. De eerste keer staat de job *Deploy naar Azure
+Container Apps* daarna nog **5–20 minuten** op *Resource group en Container Apps-omgeving*:
+Azure maakt de omgeving en een Log Analytics-workspace aan. Volgen in Cloud Shell:
+
+```bash
+source ~/ashab.env
+while true; do
+  S=$(az containerapp env show -n cae-ashab-al-jannah -g $RG --query properties.provisioningState -o tsv)
+  echo "$(date +%T)  $S"; [ "$S" = "Succeeded" ] || [ "$S" = "Failed" ] && break; sleep 30
+done
+```
+
+`Waiting` of `InProgress` is normaal. Zodra de Container App bestaat, ga je **direct door met
+stap 7**: zonder toegang tot de opslag start de container niet, en de rooktest wacht maximaal
+5 minuten. Mislukt bij deze eerste keer alleen de rooktest, dan is dat geen probleem; de
+controle in stap 7 telt.
+
+Bewaar de URL:
+
+```bash
+echo "URL=https://$(az containerapp show -n $APPNAME -g $RG --query properties.configuration.ingress.fqdn -o tsv)" >> ~/ashab.env
+source ~/ashab.env; echo $URL
+```
+
+Mislukt een job, bekijk dan de fout met `gh run view $RUN --log-failed` en herhaal na het
+oplossen alleen de mislukte jobs met `gh run rerun $RUN --failed` (zie
+[Troubleshooting](#troubleshooting-deployment)).
+
+#### Stap 7 – App toegang geven tot de opslag (Cloud Shell)
+
+De app meldt zich met haar *managed identity* aan bij de opslag; er is dus geen opslagsleutel
+nodig. Die identiteit bestaat pas na de eerste deploy, daarom gebeurt dit nu.
+
+```bash
+source ~/ashab.env
+az containerapp show -n $APPNAME -g $RG --query properties.provisioningState -o tsv   # Succeeded
+
+PRINCIPAL=$(az containerapp show -n $APPNAME -g $RG --query identity.principalId -o tsv)
+SCOPE=$(az storage account show -n $SA -g $RG --query id -o tsv)/blobServices/default/containers/ledenadmin
+az role assignment create --assignee-object-id $PRINCIPAL --assignee-principal-type ServicePrincipal \
+  --role "Storage Blob Data Contributor" --scope $SCOPE
+
+sleep 60   # rol laten doorwerken
+az containerapp revision restart -n $APPNAME -g $RG \
+  --revision $(az containerapp revision list -n $APPNAME -g $RG --query "[0].name" -o tsv)
+```
+
+**Controle** (de eerste aanroep kan 30–60 s duren; probeer het zo nodig nog eens):
+
+```bash
+curl -s $URL/api/v1/health                      # {"status":"healthy",...}
+az storage blob list --account-name $SA -c ledenadmin --auth-mode key --query "[].name" -o tsv | head
+```
+
+De tweede regel toont bestanden onder `ledenadmin/`: de back-up loopt. Tot stap 8 klaar is,
+is de app **voor iedereen open**; deel de URL nog niet.
+
+#### Stap 8 – Inloggen met Entra External ID (Easy Auth)
+
+Bezoekers loggen in bij een aparte *externe* tenant (gratis tot 50.000 maandelijkse
+gebruikers). Easy Auth van Container Apps handelt het inloggen af en geeft de identiteit door
+aan de app. Achtergrond en extra inlogmethoden (Google, Facebook, Apple):
+[4-EntraExternalID.md](4-EntraExternalID.md).
+
+**8a – Externe tenant aanmaken (portal).** In [entra.microsoft.com](https://entra.microsoft.com)
+(Nederlandse portal: *Entra ID → Overzicht → Tenants beheren → Maken*; Engels: *Manage tenants →
+Create*): kies **External**, naam `ashab-login`, een uniek domein (bijv. `ashablogin`),
+locatie Europa, jouw abonnement en resource group `rg-ashab-al-jannah`. Wacht een paar minuten
+tot de tenant klaar is.
+
+**8b – App-registratie in de externe tenant (Cloud Shell).**
+
+```bash
+source ~/ashab.env
+EXT_DOMAIN=<domein>          # zonder .onmicrosoft.com
+az login --tenant $EXT_DOMAIN.onmicrosoft.com --allow-no-subscriptions --use-device-code
+EXT_TENANT=$(az account show --query tenantId -o tsv)
+
+EXT_APP=$(az ad app create --display-name "Ashab al-Jannah" --sign-in-audience AzureADMyOrg \
+  --web-redirect-uris "$URL/.auth/login/aad/callback" --enable-id-token-issuance true \
+  --optional-claims '{"idToken":[{"name":"email","essential":false}]}' --query appId -o tsv)
+az ad sp create --id $EXT_APP >/dev/null
+printf 'EXT_DOMAIN=%s\nEXT_TENANT=%s\nEXT_APP=%s\n' $EXT_DOMAIN $EXT_TENANT $EXT_APP >> ~/ashab.env
+
+# Microsoft Graph: openid, profile, email, offline_access + admin consent
+# (gebruikers in een externe tenant kunnen zelf geen toestemming geven)
+az ad app permission add --id $EXT_APP --api 00000003-0000-0000-c000-000000000000 --api-permissions \
+  37f7f235-527c-4136-accd-4a02d197296e=Scope 14dad69e-099b-42c9-810b-d002981feec1=Scope \
+  64a6cdd6-aab1-4aaf-94b8-3cc8405e90d0=Scope 7427e0e9-2fba-42fe-b0c0-848c9e6a8182=Scope
+sleep 30
+az ad app permission admin-consent --id $EXT_APP
+```
+
+**Controle:** `az ad app show --id $EXT_APP --query "{redirect:web.redirectUris, idtoken:web.implicitGrantSettings.enableIdTokenIssuance}"`
+→ de callback-URL van je app en `true`.
+
+**8c – User flow (portal, in de externe tenant).** Open
+`https://entra.microsoft.com/?tenant=<domein>.onmicrosoft.com` en controleer rechtsboven dat je
+in **ashab-login** zit. Dan *Externe identiteiten → Gebruikersstromen → Nieuwe
+gebruikersstroom* (*External Identities → User flows → New user flow*):
+
+- Naam `signup_signin`.
+- Id-providers: onder *E-mailaccounts* **Eenmalige wachtwoordcode voor e-mail** (*Email
+  one-time passcode*). Google en andere providers kunnen later.
+- Gebruikerskenmerken: **Weergavenaam** (*Display Name*). **Maken**.
+- Open de stroom → **Toepassingen → Toepassing toevoegen** → *Ashab al-Jannah* → **Selecteren**.
+
+**Controle:** onder *Toepassingen* van de stroom staat *Ashab al-Jannah*.
+
+**8d – Easy Auth op de Container App (Cloud Shell).** Het client secret komt alleen in een
+variabele en wordt niet getoond. Voer dit in één sessie uit; is `$EXT_SECRET` weg, maak dan
+gewoon een nieuw (het vervangt het vorige).
+
+```bash
+source ~/ashab.env
+az login --tenant $EXT_DOMAIN.onmicrosoft.com --allow-no-subscriptions --use-device-code   # als je niet meer in de externe tenant bent aangemeld
+EXT_SECRET=$(az ad app credential reset --id $EXT_APP --display-name easyauth --years 2 --query password -o tsv 2>/dev/null)
+[ -n "$EXT_SECRET" ] && echo "Secret aangemaakt"
+
+az account set --subscription $SUB
+az containerapp auth microsoft update -g $RG -n $APPNAME \
+  --client-id $EXT_APP --client-secret "$EXT_SECRET" \
+  --issuer "https://$EXT_DOMAIN.ciamlogin.com/$EXT_TENANT/v2.0" --yes >/dev/null
+az containerapp auth update -g $RG -n $APPNAME --enabled true \
+  --unauthenticated-client-action RedirectToLoginPage --excluded-paths "/api/v1/health" >/dev/null
+```
+
+Het secret verloopt na 2 jaar; herhaal dan 8d.
+
+**Controle:**
+
+```bash
+az containerapp auth show -g $RG -n $APPNAME \
+  --query "{aan:platform.enabled, actie:globalValidation.unauthenticatedClientAction, uitgezonderd:globalValidation.excludedPaths, issuer:identityProviders.azureActiveDirectory.registration.openIdIssuer}" -o json
+```
+
+→ `true`, `RedirectToLoginPage`, `["/api/v1/health"]` en je `ciamlogin.com`-issuer.
+
+**8e – Inloggen testen (browser).** Open `$URL` in een **privévenster**. Je komt op de
+inlogpagina van `<domein>.ciamlogin.com`. Nieuwe gebruikers (ook jij: je beheerdersaccount van
+de tenant is geen klantaccount) kiezen **Geen account? Maak er een**, vullen hun e-mailadres en
+de gemailde code in en een weergavenaam. Daarna zie je de app met **Nieuwe stichting
+aanmaken**.
+
+#### Stap 9 – Jezelf superadmin maken (Cloud Shell)
+
+Platformbeheerders (`/platform`) staan in `SUPERADMIN_SUBJECTS` als `issuer|subject`. Die
+waarde staat in de database zodra je één keer hebt ingelogd (`/.auth/me` werkt niet: de token
+store van Easy Auth staat uit).
+
+**9a – Je issuer en subject ophalen.** Laat de app open in de browser (dan draait de
+container) en open een shell in de container:
+
+```bash
+source ~/ashab.env; az account set --subscription $SUB
+az containerapp exec -n $APPNAME -g $RG --command sh
+```
+
+In de container (alleen lezen):
+
+```sh
+python -c "import sqlite3;[print(f'{i}|{s}   <- {e}') for i,s,e in sqlite3.connect('/data/ledenadmin.db').execute('select issuer,subject,email from users')]"
+exit
+```
+
+Kopieer bij jouw e-mailadres alles vóór `   <-`. Let op: de issuer begint met het
+tenant-**id** (`https://<tenant-id>.ciamlogin.com/<tenant-id>/v2.0`), niet met het domein.
+
+**9b – Instellingen zetten.** Volgens [Instellingen later wijzigen](#instellingen-later-wijzigen):
+eerst de draaiende container stoppen, dan bijwerken.
+
+```bash
+source ~/ashab.env
+SUPER='<issuer>|<subject>'
+
+for REV in $(az containerapp revision list -n $APPNAME -g $RG --query "[?properties.active].name" -o tsv); do
+  az containerapp revision deactivate -n $APPNAME -g $RG --revision $REV
+done
+sleep 20
+az containerapp update -n $APPNAME -g $RG --set-env-vars \
+  "SUPERADMIN_SUBJECTS=$SUPER" SUPERADMIN_EMAIL=<jouw-e-mailadres> \
+  PUBLIC_BASE_URL=$URL EASYAUTH_LOGIN_URL=/.auth/login/aad >/dev/null
+```
+
+**Controle:**
+
+```bash
+az containerapp show -n $APPNAME -g $RG --query "properties.template.containers[0].env[?name=='SUPERADMIN_SUBJECTS'].value" -o tsv
+curl -s $URL/api/v1/health
+```
+
+Ververs de app en open `$URL/platform`: je ziet het platformbeheer, en je eerder aangemaakte
+stichting staat er nog (Litestream heeft de database na de herstart teruggezet).
+
+Volgende versies deploy je met
+`gh workflow run ci-cd.yml --ref main -f deploy_azure=true`; handmatig gezette instellingen
+blijven behouden. Zie verder de [Checklist productie](#checklist-productie-alle-fases) voor
+e-mail (Brevo), KVK en online doneren (Mollie).
+
+### Instellingen later wijzigen
+
+Elke wijziging van omgevingsvariabelen (`az containerapp update --set-env-vars`) start een
+nieuwe container, en Azure laat de oude dan nog even draaien. Twee containers op dezelfde
+database en back-up maken gegevens kapot. Stop daarom altijd eerst de actieve revision,
+zoals de workflow doet:
+
+```bash
+source ~/ashab.env; az account set --subscription $SUB
+for REV in $(az containerapp revision list -n $APPNAME -g $RG --query "[?properties.active].name" -o tsv); do
+  az containerapp revision deactivate -n $APPNAME -g $RG --revision $REV
+done
+sleep 20
+az containerapp update -n $APPNAME -g $RG --set-env-vars NAAM=waarde
+```
+
+Geheimen (API-sleutels) zet je als Container Apps-secret en verwijs je ernaar:
+`az containerapp secret set -n $APPNAME -g $RG --secrets brevo-api-key=<sleutel>` en daarna
+`--set-env-vars BREVO_API_KEY=secretref:brevo-api-key` (met de stappen hierboven).
+Wijzigingen in Easy Auth (`az containerapp auth ...`) starten geen nieuwe container.
+
+### Troubleshooting deployment
+
+Algemene hulpmiddelen:
+
+```bash
+az containerapp logs show -n $APPNAME -g $RG --tail 100                 # uitvoer van de app
+az containerapp logs show -n $APPNAME -g $RG --type system --tail 50    # opstarten, image ophalen
+az containerapp revision list -n $APPNAME -g $RG -o table               # welke revision actief/gezond is
+```
+
+```powershell
+gh run view <run-id> --log-failed     # fout van een mislukte workflow-job
+gh run rerun <run-id> --failed        # alleen de mislukte jobs opnieuw (zelfde image)
+```
+
+| Symptoom | Oorzaak | Oplossing |
+|---|---|---|
+| `ERROR: argument --name/-n: expected one argument` | Cloud Shell is herladen; variabelen zijn leeg | `source ~/ashab.env` en opnieuw |
+| `AuthorizationFailure` bij `az storage container create` | Owner heeft geen rechten op blobgegevens | `az storage container-rm create` (stap 3) |
+| Deploy-job: `AADSTS700213: No matching federated identity record found for presented assertion subject '...'` | Subject in Entra wijkt af van wat GitHub stuurt | Kopieer het subject uit de foutmelding en werk de credential bij: `az ad app federated-credential update --id $GITHUB_APP --federated-credential-id github-production --parameters '{"name":"github-production","issuer":"https://token.actions.githubusercontent.com","subject":"<subject>","audiences":["api://AzureADTokenExchange"]}'`; dan `gh run rerun <run-id> --failed` |
+| Deploy-job: `MissingSubscriptionRegistration` of geen rechten op `Microsoft.App/register` | Resource providers niet geregistreerd | Stap 2 |
+| Job staat lang op *Resource group en Container Apps-omgeving*; omgeving `Waiting` | Eerste keer aanmaken duurt 5–20 min | Wachten (lus in stap 6); bij `Failed`: `az containerapp env show -n cae-ashab-al-jannah -g $RG -o json` |
+| Rooktest op Azure faalt na de eerste deploy; health geeft geen antwoord; systeemlog toont herstarts | App mag de back-up niet lezen (Litestream stopt bewust) | Stap 7; controleer met `az role assignment list --assignee $PRINCIPAL --all -o table` |
+| Systeemlog: `unauthorized` / image pull mislukt | `GHCR_PULL_TOKEN` verlopen of zonder `read:packages` | Nieuwe token (stap 5), `gh secret set GHCR_PULL_TOKEN --env production`, deploy opnieuw |
+| Deploy stopt met "De app gebruikt nog DATABASE_URL (Azure SQL)" | Oude installatie | [Overstap van Azure SQL](#overstap-van-azure-sql) |
+| Portal geeft `errorCode 401` met je `subscriptionId` in de externe tenant | Portal gebruikt nog de context van je gewone tenant | `https://entra.microsoft.com/?tenant=<domein>.onmicrosoft.com`; niet via *Abonnementen* of *Resourcegroepen* |
+| Inlogpagina: "Er is geen account met dit e-mailadres gevonden" | Nog geen klantaccount in de externe tenant | **Geen account? Maak er een** (stap 8e) |
+| Na inloggen `AADSTS65001` / "toestemming van beheerder nodig" | Geen admin consent | `az ad app permission admin-consent --id $EXT_APP` in de externe tenant (stap 8b) |
+| Na inloggen een fout van Easy Auth (`401`/`403`) of een lus terug naar de inlogpagina | Verkeerde issuer, client-id of secret | Controle van 8d; secret opnieuw maken met 8d |
+| Client secret per ongeluk getoond of gedeeld | Secret niet meer geheim | 8d opnieuw: `credential reset` vervangt het oude secret |
+| `/.auth/me` geeft 404 | Token store van Easy Auth staat uit (standaard) | Niet nodig; issuer en subject uit de database halen (stap 9a) |
+| `/platform` geeft geen toegang | `SUPERADMIN_SUBJECTS` wijkt af (bijv. domein i.p.v. tenant-id in de issuer) | Waarde exact overnemen uit stap 9a, dan 9b |
+| Mollie-betalingen blijven op "open" staan | Easy Auth stuurt de webhook naar de inlogpagina | Pad `/betalingen/webhook/<slug>` toevoegen aan `--excluded-paths` (naast `/api/v1/health`); controle: `curl -s -o /dev/null -w "%{http_code}" -X POST $URL/betalingen/webhook/<slug>` geeft `200`, geen `302` |
 
 ### Back-up en herstel
 
@@ -641,7 +1354,8 @@ gegevens over. De workflow weigert te deployen zolang de app nog `DATABASE_URL` 
    az containerapp update -n ashab-al-jannah -g rg-ashab-al-jannah --remove-env-vars DATABASE_URL
    ```
 
-4. Volg de eenmalige stappen hierboven (opslag, variabele, rol) en deploy. Bewaar de Azure
+4. Volg de stappen uit [Eerste deployment stap voor stap](#eerste-deployment-stap-voor-stap)
+   (opslag, variabele, rol: stap 3, 5 en 7) en deploy. Bewaar de Azure
    SQL-database nog even als vangnet en verwijder hem daarna.
 
 ## Uitbreidingen na de MVP
