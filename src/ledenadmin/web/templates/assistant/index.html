@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "macros.html" import csrf %}
+{% block title %}Assistent – {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Assistent</h1>
+<p>Stel een vraag over het gebruik of de werking van {{ app_name }}. De assistent kent alleen de
+  <a href="{{ org }}/help">handleiding</a>: hij heeft geen toegang tot uw gegevens en kan niets wijzigen.</p>
+<form method="post" action="{{ org }}/assistent" hx-post="{{ org }}/assistent" hx-target="#assistent-antwoord"
+      hx-disabled-elt="find button" class="assistant-form" novalidate>
+  {{ csrf(csrf_token) }}
+  <label for="assistent_vraag">Uw vraag
+    <textarea id="assistent_vraag" name="assistent_vraag" rows="3" required
+              maxlength="{{ assistant.max_question_chars }}" aria-describedby="assistent-hulp"
+              placeholder="Bijvoorbeeld: hoe nodig ik een penningmeester uit?">{{ question }}</textarea>
+  </label>
+  <small id="assistent-hulp">Maximaal {{ assistant.max_question_chars }} tekens. Deel geen persoonsgegevens: e-mailadressen en nummers worden vóór verzending weggehaald.</small>
+  <button type="submit">Vraag stellen</button>
+</form>
+<section id="assistent-antwoord" aria-live="polite">
+  {% include "assistant/_reply.html" %}
+</section>
+{% endblock %}

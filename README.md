@@ -58,6 +58,7 @@ uitbreidingspunten.
   - [Categorieën beheren](#categorieën-beheren)
   - [Rapportage (US04–US06)](#rapportage-us04us06)
   - [AI-inzichten (US07)](#ai-inzichten-us07)
+  - [Helpassistent (US16)](#helpassistent-us16)
 - [Niet-functionele requirements](#niet-functionele-requirements)
 - [Configuratie](#configuratie)
   - [Checklist productie (alle fases)](#checklist-productie-alle-fases)
@@ -76,6 +77,22 @@ uitbreidingspunten.
       (achtergrond: [4-EntraExternalID](./4-EntraExternalID.md))
     - [Stap 9 – Jezelf superadmin maken](#stap-9--jezelf-superadmin-maken-cloud-shell)
   - [Instellingen later wijzigen](#instellingen-later-wijzigen)
+  - [Helpassistent aanzetten (Azure OpenAI)](#helpassistent-aanzetten-azure-openai)
+    - [A1 – Resource provider registreren](#a1--resource-provider-registreren-cloud-shell)
+    - [A2 – Azure OpenAI-resource in de EU](#a2--azure-openai-resource-in-de-eu-cloud-shell)
+    - [A3 – Model deployen met harde grenzen](#a3--model-deployen-met-harde-grenzen-cloud-shell)
+    - [A4 – Proefvraag aan het model](#a4--proefvraag-aan-het-model-cloud-shell)
+    - [A5 – Instellingen in GitHub](#a5--instellingen-in-github-powershell-op-je-pc)
+    - [A6 – Deployen](#a6--deployen-powershell)
+    - [A7 – Testen](#a7--testen-browser)
+    - [Kosten en extra grenzen](#kosten-en-extra-grenzen)
+    - [Uitzetten](#uitzetten)
+  - [Helpassistent met Google Gemini](#helpassistent-met-google-gemini)
+    - [G1 – API-sleutel in Google AI Studio](#g1--api-sleutel-in-google-ai-studio-browser)
+    - [G2 – Model kiezen en proefvraag](#g2--model-kiezen-en-proefvraag-cloud-shell)
+    - [G3 – Instellingen in GitHub](#g3--instellingen-in-github-powershell-op-je-pc)
+    - [G4 – Deployen en testen](#g4--deployen-en-testen)
+  - [Wisselen tussen Azure OpenAI en Gemini](#wisselen-tussen-azure-openai-en-gemini)
   - [Troubleshooting deployment](#troubleshooting-deployment)
   - [Back-up en herstel](#back-up-en-herstel)
   - [Overstap van Azure SQL](#overstap-van-azure-sql)
@@ -343,7 +360,7 @@ voor productie.
 | Data | SQLAlchemy 2 + Alembic, SQLite | Typed ORM, migraties; lokaal en in productie hetzelfde SQLite-bestand |
 | Back-up | [Litestream](https://litestream.io) naar Azure Blob Storage | Continue back-up (± 1 s), terugzetten bij het opstarten; een paar cent per maand |
 | Rapportage | pandas | Aggregaties per categorie, subcategorie, maand en lid; CSV-export |
-| AI | Provider-interface: lokaal (standaard), OpenAI/Azure OpenAI, Anthropic | Werkt zonder externe dienst; alleen geaggregeerde data naar buiten |
+| AI | Provider-interface: lokaal (standaard), OpenAI/Azure OpenAI, Google Gemini, Anthropic; wisselen met `AI_PROVIDER` | Werkt zonder externe dienst; alleen geaggregeerde data naar buiten. Optionele helpassistent (US16) met alleen de handleiding als kennis |
 | Auth | Azure Container Apps-authenticatie (Easy Auth, Entra ID) + rollen in de app | Geen eigen wachtwoordbeheer; autorisatie server-side |
 | Hosting | Azure Container Apps (één container, scale-to-zero) | HTTPS, gratis maandtegoed; zie [3-MultiTenantOntwerp.md](./3-MultiTenantOntwerp.md) § 11.1 |
 | Tests | pytest (unit/API/web), Robot Framework (acceptatie, Gherkin-stijl) | Snelle feedback + gebruikersgerichte scenario's |
@@ -421,7 +438,7 @@ flowchart TB
             Webhook["web/payments.py<br/>Mollie-webhook"]
         end
         Deps["api/deps.py + auth/<br/>AuthProvider → Identity → Principal<br/>organisatie uit pad, rollen, rechten"]
-        Services["services/ via ServiceContainer<br/>leden, donaties, categorieën, rapportage,<br/>gebruikers, organisaties, betalingen, mail, KVK"]
+        Services["services/ via ServiceContainer<br/>leden, donaties, categorieën, rapportage,<br/>gebruikers, organisaties, betalingen, mail, KVK,<br/>helpassistent (optioneel)"]
         Ports["Uitbreidingspunten (adapters)<br/>InsightProvider (AI), ReportExporter (CSV),<br/>mail (Brevo), Mollie, KVK"]
         Repos["repositories/<br/>data-toegang per aggregaat"]
         Domain["domain/ + tenancy.py<br/>ORM-modellen, rollen/rechten, geld in centen,<br/>automatisch filter op organization_id"]
@@ -429,7 +446,7 @@ flowchart TB
     end
 
     SQLite[("SQLite<br/>/data/ledenadmin.db")]
-    Ext["Externe diensten<br/>OpenAI/Anthropic, Mollie, Brevo, KVK"]
+    Ext["Externe diensten<br/>Azure OpenAI/OpenAI/Anthropic, Mollie, Brevo, KVK"]
 
     Browser --> EasyAuth
     ApiClient --> EasyAuth
@@ -471,7 +488,7 @@ flowchart TB
         SA[("Storage account<br/>container ledenadmin<br/>back-up + 14 dagen soft delete")]
     end
 
-    Partners["Externe diensten<br/>Mollie, Brevo, KVK, AI-provider"]
+    Partners["Externe diensten<br/>Mollie, Brevo, KVK,<br/>Azure OpenAI (EU, optioneel)"]
 
     User -->|HTTPS| Ingress
     Ingress <-->|niet ingelogd: inloggen| Flow
@@ -752,8 +769,42 @@ gebeurt dat bij de eerstvolgende logregel.
 - Zonder data wordt de provider niet aangeroepen. Als een externe dienst faalt, valt de
   app terug op de lokale analyse en meldt dat.
 - `AI_PROVIDER=local` (standaard) gebruikt een deterministische, regelgebaseerde
-  samenvatting. Voor `openai` (ook Azure OpenAI via `OPENAI_BASE_URL`) en `anthropic`
-  zijn `AI_MODEL` en een API-sleutel verplicht.
+  samenvatting. Voor `openai` (ook Azure OpenAI via `OPENAI_BASE_URL`), `gemini` en
+  `anthropic` zijn een model (`<DIENST>_MODEL` of `AI_MODEL`) en een API-sleutel verplicht.
+
+### Helpassistent (US16)
+
+Gebruikers stellen in de app een vraag over het gebruik of de werking van Ashab al-Jannah
+(menu **Assistent**, en een verwijzing bovenaan **Help**). Een AI-model beantwoordt die op basis
+van de handleiding. De code staat in
+[services/assistant](./src/ledenadmin/services/assistant) en
+[web/assistant.py](./src/ledenadmin/web/assistant.py); aanzetten: zie
+[Helpassistent aanzetten](#helpassistent-aanzetten-azure-openai).
+
+- **Standaard uit.** Alleen met `ASSISTANT_ENABLED=true` én een externe `AI_PROVIDER`
+  (`openai`/Azure OpenAI, `gemini` of `anthropic`). Anders is er geen menu-item, geen verwijzing in Help
+  en geeft `/o/<slug>/assistent` een 404.
+- **Kennis**: alleen de help-secties die bij de rol van de gebruiker horen (zoals op de
+  Help-pagina) plus vaste kennisbestanden in
+  [kennis/](./src/ledenadmin/services/assistant/kennis): `functies.md` en `techniek.md` voor
+  iedereen, `platform-techniek.md` alleen voor de superadmin. Nieuwe kennis = deze bestanden of
+  de help-templates aanvullen.
+
+Grenzen:
+
+| Grens | Hoe |
+|---|---|
+| Alleen over de app | Instructies met een strikte afbakening; het model moet `op_onderwerp` invullen. Bij `false` toont de app een vaste weigering, niet de tekst van het model. |
+| Alleen uit de handleiding | Het model krijgt alleen de kennis hierboven en moet zeggen als het antwoord er niet in staat. Bronnen moeten uit die kennis komen (JSON-schema met een vaste lijst); de app toont ze als link naar de Help. |
+| Geen gegevens | Er gaan nooit leden, donaties, gebruikers of organisatiegegevens naar de AI-dienst. E-mailadressen, IBAN's, telefoon- en andere lange nummers in de vraag worden vóór verzending vervangen. |
+| Niets bewaard | Vragen en antwoorden worden niet opgeslagen of gelogd (ook niet in het logboek); alleen het aantal per gebruiker per dag. Bij OpenAI/Azure OpenAI met `store=false`; Gemini gebruikt ze met een gekoppeld betaalaccount niet voor training (zie [Gemini](#helpassistent-met-google-gemini)). |
+| Prompt-injectie | De vraag staat apart van de instructies en wordt als gegevens behandeld; één vraag per keer zonder geschiedenis. Een geheime controlecode in de instructies: komt die in een antwoord terug, dan volgt de weigering. |
+| Uitvoer | Alleen een geldig JSON-object volgens een strikt schema; anders een vaste melding. Antwoord hoogstens 2000 tekens, getoond als platte tekst (alinea's en lijsten, ge-escaped). |
+| Omvang en kosten | Vraag max. `ASSISTANT_MAX_QUESTION_CHARS`, antwoord max. `ASSISTANT_MAX_OUTPUT_TOKENS`, daglimiet per gebruiker en voor het hele platform. Een mislukte aanroep telt niet mee. |
+| Toegang | Alleen ingelogde gebruikers met een rol in de organisatie; CSRF-controle op elke vraag. |
+
+Een AI-model kan zich ondanks deze grenzen vergissen. Daarom staat bij elk antwoord dat het
+van een AI-assistent komt, met een link naar de Help als bron.
 
 ## Niet-functionele requirements
 
@@ -791,9 +842,18 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 | `MAIL_SENDER_EMAIL` / `MAIL_SENDER_NAME` | `noreply@example.nl` / `Ashab al-Jannah` | Afzender van e-mails |
 | `MAIL_DAILY_LIMIT` | `300` | E-mails per dag (gratis Brevo-limiet); waarschuwing vanaf 80% |
 | `TIMEZONE` | `Europe/Amsterdam` | Weergave en periodegrenzen |
-| `AI_PROVIDER` | `local` | `local`, `openai` of `anthropic` |
-| `AI_MODEL` / `AI_TIMEOUT_SECONDS` | leeg / `20` | Model en time-out voor `openai`/`anthropic` |
-| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `ANTHROPIC_API_KEY` | leeg | Sleutels/endpoint van de AI-provider |
+| `AI_PROVIDER` | `local` | `local`, `openai` (ook Azure OpenAI), `gemini` of `anthropic`. Wisselen = alleen deze waarde aanpassen; zie [Wisselen](#wisselen-tussen-azure-openai-en-gemini) |
+| `AI_MODEL` / `AI_TIMEOUT_SECONDS` | leeg / `20` | Model (terugval als `<DIENST>_MODEL` leeg is) en time-out |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL` | leeg | OpenAI of Azure OpenAI (`OPENAI_MODEL` = naam van de deployment) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | leeg | Google Gemini via het OpenAI-compatibele endpoint, bijv. `gemini-3.5-flash-lite` |
+| `GEMINI_REASONING_EFFORT` | `minimal` | Hoeveel Gemini nadenkt: `none` (alleen 2.5-modellen), `minimal`, `low`, `medium`, `high`; leeg = standaard van het model |
+| `GEMINI_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` | Alleen wijzigen voor een eigen gateway |
+| `ANTHROPIC_API_KEY` / `ANTHROPIC_MODEL` | leeg | Anthropic Claude |
+| `ASSISTANT_ENABLED` | `false` | Helpassistent (US16) aan; werkt alleen met `AI_PROVIDER` `openai`, `gemini` of `anthropic`, anders blijft hij onzichtbaar. Zie [Helpassistent aanzetten](#helpassistent-aanzetten-azure-openai) |
+| `ASSISTANT_DAILY_LIMIT_PER_USER` | `20` | Vragen per gebruiker per dag (1–100) |
+| `ASSISTANT_DAILY_LIMIT_TOTAL` | `300` | Vragen per dag voor het hele platform (1–5000); begrenst de kosten |
+| `ASSISTANT_MAX_QUESTION_CHARS` | `500` | Maximale lengte van een vraag (50–1000) |
+| `ASSISTANT_MAX_OUTPUT_TOKENS` | `600` | Maximale lengte van een antwoord in tokens (100–1500) |
 | `KVK_API_URL` | `https://api.kvk.nl/api/v2/zoeken` | Endpoint van de KVK Zoeken-API |
 | `SECRET_ENCRYPTION_KEY` | leeg | Fernet-sleutel voor de Mollie-sleutels van stichtingen; leeg = online doneren uit (zie *Online doneren*) |
 | `MOLLIE_API_URL` | `https://api.mollie.com/v2` | Mollie-API |
@@ -813,6 +873,11 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 4. **Fase 5–6** – geen extra instellingen (rol *lid*, export/verwijderen werken direct).
 5. **Fase 7** – `SECRET_ENCRYPTION_KEY` genereren en veilig bewaren; elke stichting koppelt zelf
    Mollie in *Instellingen*.
+6. **Optioneel: helpassistent** – Azure OpenAI in de EU (`AI_PROVIDER=openai`, `OPENAI_MODEL`,
+   `OPENAI_BASE_URL`, `OPENAI_API_KEY`) of Google Gemini (`AI_PROVIDER=gemini`, `GEMINI_MODEL`,
+   `GEMINI_API_KEY`), plus `ASSISTANT_ENABLED=true`; zie
+   [Helpassistent aanzetten](#helpassistent-aanzetten-azure-openai) en
+   [Gemini](#helpassistent-met-google-gemini).
 
 ## Tests en kwaliteit
 
@@ -829,8 +894,9 @@ Alle instellingen staan in [.env.example](./.env.example). De belangrijkste:
 - **Robot Framework** ([tests/functional](./tests/functional)): elke testnaam en
   Given/When/Then-stap komt overeen met een scenario in [2-TestScenarios](./2-TestScenarios).
   Tags koppelen aan user stories (`US01` … `US08`); `smoke` draait ook na een deploy. De
-  scenario's voor US11–US15 (meerdere stichtingen, uitnodigen, online doneren, donaties
-  corrigeren, platformbeheer) zijn met pytest geautomatiseerd; bij elk scenario staat de test.
+  scenario's voor US11–US16 (meerdere stichtingen, uitnodigen, online doneren, donaties
+  corrigeren, platformbeheer, helpassistent) zijn met pytest geautomatiseerd; bij elk scenario
+  staat de test. De helpassistent wordt getest met een nep-AI-dienst, dus zonder kosten of sleutel.
 - De UI is handmatig gecontroleerd op desktop en mobiel (390 px). Geautomatiseerde
   browsertests (robotframework-browser) zijn een mogelijke volgende stap.
 
@@ -1038,8 +1104,9 @@ PowerShell-geschiedenis komt:
 gh secret set GHCR_PULL_TOKEN --env production
 ```
 
-Optioneel (AI): variabelen `AI_PROVIDER`, `AI_MODEL`, `OPENAI_BASE_URL` en secrets
-`OPENAI_API_KEY`, `ANTHROPIC_API_KEY` op dezelfde manier.
+Optioneel (AI): variabelen `AI_PROVIDER`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `GEMINI_MODEL` en
+secrets `OPENAI_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY` op dezelfde manier; zie
+[Helpassistent aanzetten](#helpassistent-aanzetten-azure-openai).
 
 **Controle:**
 
@@ -1281,6 +1348,306 @@ Geheimen (API-sleutels) zet je als Container Apps-secret en verwijs je ernaar:
 `--set-env-vars BREVO_API_KEY=secretref:brevo-api-key` (met de stappen hierboven).
 Wijzigingen in Easy Auth (`az containerapp auth ...`) starten geen nieuwe container.
 
+### Helpassistent aanzetten (Azure OpenAI)
+
+De [helpassistent (US16)](#helpassistent-us16) staat standaard uit. Deze stappen zetten hem aan
+met **Azure OpenAI in de EU**. Doe ze na de eerste deployment; je werkt weer in Cloud Shell
+(`source ~/ashab.env`) en PowerShell met `gh`. Reken op 20 minuten.
+
+Liever **Google Gemini**? Volg dan [Helpassistent met Google Gemini](#helpassistent-met-google-gemini).
+Je kunt ook beide instellen en later met één variabele (`AI_PROVIDER`) wisselen; zie
+[Wisselen tussen Azure OpenAI en Gemini](#wisselen-tussen-azure-openai-en-gemini).
+
+| | Azure OpenAI (`openai`) | Google Gemini (`gemini`) |
+|---|---|---|
+| Waar verwerkt | Binnen de EU (`DataZoneStandard`) | Wereldwijd; geen EU-garantie |
+| Gebruik voor training | Nee | Nee, mits een **betaalaccount** gekoppeld is |
+| Kosten per vraag | Fractie van een cent | Fractie van een cent; nieuw Google Cloud-account krijgt startkrediet |
+| Harde grens bij Azure/Google | Tokens per minuut per deployment | Quotum per project (aanpasbaar in Google Cloud) |
+| Instellen | A1 t/m A7 (± 20 min) | G1 t/m G4 (± 10 min) |
+
+> **Let op:** met `AI_PROVIDER=openai` gebruikt ook de bestaande *AI Analyse* in Rapportage
+> Azure OpenAI. Die stuurt alleen totalen, nooit namen of e-mailadressen.
+
+#### A1 – Resource provider registreren (Cloud Shell)
+
+Eenmalig per abonnement, net als stap 2.
+
+```bash
+source ~/ashab.env; az account set --subscription $SUB
+az provider register -n Microsoft.CognitiveServices --wait
+```
+
+**Controle:** `az provider show -n Microsoft.CognitiveServices --query registrationState -o tsv` → `Registered`.
+
+#### A2 – Azure OpenAI-resource in de EU (Cloud Shell)
+
+Kies een naam: wereldwijd uniek, kleine letters, cijfers en `-`. Hij wordt ook het adres
+`https://<naam>.openai.azure.com`. De regio **Sweden Central** heeft de meeste modellen en ligt in
+de EU.
+
+```bash
+AOAI=<naam>                 # bijv. aoai-ashab-1234
+AOAI_LOC=swedencentral
+az cognitiveservices account create -n $AOAI -g $RG -l $AOAI_LOC \
+  --kind OpenAI --sku S0 --custom-domain $AOAI --yes
+printf 'AOAI=%s\nAOAI_LOC=%s\n' $AOAI $AOAI_LOC >> ~/ashab.env
+```
+
+**Controle:** `az cognitiveservices account show -n $AOAI -g $RG --query "{status:properties.provisioningState, endpoint:properties.endpoint}" -o table`
+→ `Succeeded` en `https://<naam>.openai.azure.com/`.
+
+#### A3 – Model deployen met harde grenzen (Cloud Shell)
+
+Gebruik een **klein chatmodel zonder redeneerstap dat structured outputs ondersteunt**,
+bijvoorbeeld `gpt-4.1-mini`. Bekijk welke versies en SKU's er in de regio zijn:
+
+```bash
+az cognitiveservices model list -l $AOAI_LOC \
+  --query "[?model.name=='gpt-4.1-mini'].{versie:model.version, skus:join(',', model.skus[].name)}" -o table
+```
+
+Deploy met SKU **`DataZoneStandard`**: de verwerking blijft dan binnen de EU. Kies de versie uit
+de lijst hierboven.
+
+```bash
+az cognitiveservices account deployment create -n $AOAI -g $RG \
+  --deployment-name assistent --model-name gpt-4.1-mini --model-version <versie> \
+  --model-format OpenAI --sku-name DataZoneStandard --sku-capacity 20
+```
+
+`--sku-capacity 20` is een harde grens van 20.000 tokens per minuut: genoeg voor ongeveer vier
+vragen per minuut. Daarboven weigert Azure (de app meldt dan "niet bereikbaar"), dus de kosten
+kunnen nooit uit de hand lopen. Azure filtert in- en uitvoer daarnaast standaard op schadelijke
+inhoud.
+
+**Controle:**
+
+```bash
+az cognitiveservices account deployment show -n $AOAI -g $RG --deployment-name assistent \
+  --query "{model:properties.model.name, versie:properties.model.version, sku:sku.name, capaciteit:sku.capacity, status:properties.provisioningState}" -o table
+```
+
+#### A4 – Proefvraag aan het model (Cloud Shell)
+
+Zo weet je zeker dat endpoint, sleutel en deployment kloppen, voordat de app ze gebruikt.
+
+```bash
+KEY=$(az cognitiveservices account keys list -n $AOAI -g $RG --query key1 -o tsv)
+curl -s "https://$AOAI.openai.azure.com/openai/v1/responses" \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"assistent","input":"Antwoord alleen met: ok","max_output_tokens":16,"store":false}' \
+  | jq -r '.output[0].content[0].text // .error.message'
+```
+
+**Controle:** je ziet `ok`. Een foutmelding? Zie [Troubleshooting](#troubleshooting-deployment).
+
+#### A5 – Instellingen in GitHub (PowerShell op je pc)
+
+De sleutel komt als secret in GitHub; de workflow zet hem als Container Apps-secret. Haal hem op
+met `az cognitiveservices account keys list -n <naam> -g rg-ashab-al-jannah --query key1 -o tsv`
+(in Cloud Shell) en plak hem alleen in het commando hieronder, nergens anders.
+
+```powershell
+cd <map-van-de-repo>
+gh secret set OPENAI_API_KEY --env production          # plak key1 als daarom gevraagd wordt
+gh variable set AI_PROVIDER     --env production --body openai
+gh variable set OPENAI_MODEL    --env production --body assistent   # naam van de deployment (A3)
+gh variable set OPENAI_BASE_URL --env production --body "https://<naam>.openai.azure.com/openai/v1/"
+gh variable set ASSISTANT_ENABLED --env production --body true
+
+# Optioneel strenger dan de standaard (20 per gebruiker, 300 totaal per dag):
+gh variable set ASSISTANT_DAILY_LIMIT_PER_USER --env production --body 10
+gh variable set ASSISTANT_DAILY_LIMIT_TOTAL    --env production --body 100
+```
+
+**Controle:** `gh variable list --env production` toont `AI_PROVIDER`, `OPENAI_MODEL`,
+`OPENAI_BASE_URL` en `ASSISTANT_ENABLED`; `gh secret list --env production` toont `OPENAI_API_KEY`.
+
+`OPENAI_MODEL` gaat voor op het algemene `AI_MODEL`. Gebruik het per-dienst-model, dan kun je
+later naar Gemini wisselen zonder het model van Azure OpenAI te verliezen.
+
+Ongeldige waarden (bijvoorbeeld `ASSISTANT_ENABLED=ja` of een limiet buiten de grenzen in de
+[Configuratie](#configuratie)) laten de deploy stoppen vóórdat de draaiende app wordt geraakt.
+Wil je later terug naar een standaardwaarde, **zet** de variabele dan op die waarde (bijv.
+`--body 20`). Een variabele verwijderen laat de oude waarde op de Container App staan.
+
+#### A6 – Deployen (PowerShell)
+
+De workflow controleert eerst of de AI-instellingen compleet zijn en stopt anders vóórdat de
+draaiende app wordt geraakt.
+
+```powershell
+gh workflow run ci-cd.yml --ref main -f deploy_azure=true
+Start-Sleep 5
+$RUN = gh run list --workflow ci-cd.yml -L 1 --json databaseId -q '.[0].databaseId'
+gh run watch $RUN
+```
+
+**Controle (Cloud Shell):**
+
+```bash
+az containerapp show -n $APPNAME -g $RG \
+  --query "properties.template.containers[0].env[?starts_with(name,'ASSISTANT') || starts_with(name,'AI_') || starts_with(name,'OPENAI_') || starts_with(name,'GEMINI_')].{naam:name, waarde:value, secret:secretRef}" -o table
+```
+
+#### A7 – Testen (browser)
+
+1. Open de app: in het menu staat **Assistent**, en bovenaan **Help** staat *Vraag het de assistent*.
+2. Vraag bijvoorbeeld *"Hoe nodig ik een penningmeester uit?"*. Je krijgt een kort antwoord in
+   stappen, met een link naar de Help, en *Nog 19 van 20 vragen vandaag*.
+3. Vraag iets anders, bijvoorbeeld *"Wat is de hoofdstad van Frankrijk?"*. Je krijgt de vaste
+   weigering.
+4. Logs (Cloud Shell): `az containerapp logs show -n $APPNAME -g $RG --tail 50 | grep Helpassistent`
+   toont regels als *vraag beantwoord (1 bron(nen))*, zonder de vraag zelf.
+
+#### Kosten en extra grenzen
+
+- Per vraag gaan ongeveer 5.000 tokens heen (vooral de handleiding) en hoogstens 600 terug: met
+  `gpt-4.1-mini` een fractie van een cent. Met de standaardlimiet van 300 vragen per dag is het
+  maximum enkele euro's per week; in de praktijk veel minder. Controleer de actuele prijzen op de
+  [prijspagina van Azure OpenAI](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/).
+- Zet in de portal een **budget** met waarschuwing: *Kostenbeheer → Budgetten → Toevoegen*, scope
+  `rg-ashab-al-jannah`, bijvoorbeeld € 10 per maand met een melding bij 80%.
+
+#### Uitzetten
+
+- **Normaal:** `gh variable set ASSISTANT_ENABLED --env production --body false` en deploy (A6).
+  Het menu-item verdwijnt; `/assistent` geeft 404.
+- **Direct (noodstop):** verwijder de modeldeployment; de app meldt dan "niet bereikbaar" tot je
+  hem weer aanmaakt of de assistent uitzet:
+  `az cognitiveservices account deployment delete -n $AOAI -g $RG --deployment-name assistent`.
+- **Sleutel vervangen** (bijvoorbeeld na een lek): `az cognitiveservices account keys regenerate
+  -n $AOAI -g $RG --key-name key1`, dan A5 (`OPENAI_API_KEY`) en A6.
+
+### Helpassistent met Google Gemini
+
+De app praat met Gemini via het
+[OpenAI-compatibele endpoint](https://ai.google.dev/gemini-api/docs/openai) van Google, met
+hetzelfde strikte JSON-schema en dezelfde grenzen als bij Azure OpenAI. Er is geen extra pakket
+nodig. Met `AI_PROVIDER=gemini` gebruikt ook de *AI Analyse* in Rapportage Gemini (alleen totalen).
+Reken op 10 minuten.
+
+> **Let op: gratis quotum en de EU.** De
+> [voorwaarden van de Gemini API](https://ai.google.dev/gemini-api/terms) staan voor een app met
+> gebruikers in de EER, Zwitserland of het VK **alleen betaalde diensten** toe. Koppel daarom in
+> G1 een **betaalaccount** (Cloud Billing) aan het project van de sleutel. Een nieuw Google
+> Cloud-account krijgt meestal startkrediet, zodat de eerste periode niets kost; controleer de
+> actuele voorwaarden. Met een betaalaccount gebruikt Google vragen en antwoorden niet voor
+> training, maar bewaart ze kort om misbruik op te sporen, en de verwerking kan buiten de EU
+> gebeuren. Het quotum zonder betaalaccount is alleen geschikt om lokaal te proberen (`.env`).
+
+#### G1 – API-sleutel in Google AI Studio (browser)
+
+1. Open [aistudio.google.com/apikey](https://aistudio.google.com/apikey) en log in, bij voorkeur
+   met een Google-account van de stichting.
+2. **Create API key** → kies of maak een project, bijv. `ashab-al-jannah`. Kopieer de sleutel nog
+   niet naar een bestand; je plakt hem straks alleen in G2 en G3.
+3. **Betaalaccount koppelen**: klik bij het project op **Set up billing** (of ga naar
+   [console.cloud.google.com/billing](https://console.cloud.google.com/billing)) en koppel een
+   betaalaccount.
+4. **Budget met waarschuwing** (aanbevolen): Google Cloud console → *Billing → Budgets & alerts →
+   Create budget*, bijvoorbeeld € 5 per maand met een melding bij 80%.
+5. **Sleutel beperken** (aanbevolen): Google Cloud console → *APIs & Services → Credentials* → de
+   sleutel → *API restrictions* → alleen **Generative Language API**.
+
+**Controle:** in AI Studio staat bij het project een betaalde laag (bijv. *Tier 1*), niet *Free*.
+
+#### G2 – Model kiezen en proefvraag (Cloud Shell)
+
+De sleutel komt niet in je geschiedenis: `read -s` vraagt hem onzichtbaar.
+
+```bash
+read -rs GEMINI_KEY; echo          # plak de sleutel uit G1 en druk Enter
+curl -s https://generativelanguage.googleapis.com/v1beta/openai/models \
+  -H "Authorization: Bearer $GEMINI_KEY" | jq -r '.data[].id' | sed 's#^models/##' | grep flash | sort
+```
+
+Kies een **Flash-Lite**-model van generatie 3 of nieuwer, bijvoorbeeld `gemini-3.5-flash-lite`:
+snel, goedkoop en geschikt voor structured output. Proefvraag met een JSON-schema, zoals de app
+dat doet:
+
+```bash
+GEMINI_MODEL=gemini-3.5-flash-lite
+curl -s https://generativelanguage.googleapis.com/v1beta/openai/chat/completions \
+  -H "Authorization: Bearer $GEMINI_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"'"$GEMINI_MODEL"'","reasoning_effort":"minimal","max_tokens":100,
+       "messages":[{"role":"user","content":"Antwoord met: ok"}],
+       "response_format":{"type":"json_schema","json_schema":{"name":"proef","strict":true,
+         "schema":{"type":"object","properties":{"antwoord":{"type":"string"}},
+                   "required":["antwoord"],"additionalProperties":false}}}}' \
+  | jq -r '.choices[0].message.content // .error.message // .[0].error.message'
+```
+
+**Controle:** je ziet iets als `{"antwoord": "ok"}`. Een foutmelding? Zie
+[Troubleshooting](#troubleshooting-deployment).
+
+#### G3 – Instellingen in GitHub (PowerShell op je pc)
+
+```powershell
+cd <map-van-de-repo>
+gh secret set GEMINI_API_KEY --env production            # plak de sleutel uit G1
+gh variable set GEMINI_MODEL --env production --body gemini-3.5-flash-lite   # model uit G2
+gh variable set AI_PROVIDER  --env production --body gemini
+gh variable set ASSISTANT_ENABLED --env production --body true
+```
+
+Optioneel: `GEMINI_REASONING_EFFORT` (standaard `minimal`, zo weinig mogelijk "nadenken", dus
+snel en goedkoop). Gebruik je een Gemini 2.5-model, zet hem dan op `none`.
+
+**Controle:** `gh variable list --env production` toont `AI_PROVIDER=gemini`, `GEMINI_MODEL` en
+`ASSISTANT_ENABLED`; `gh secret list --env production` toont `GEMINI_API_KEY`.
+
+#### G4 – Deployen en testen
+
+Deploy zoals in [A6](#a6--deployen-powershell) en test zoals in [A7](#a7--testen-browser). In de
+logs staat bij een fout *AI-dienst 'gemini' faalde*.
+
+**Uitzetten** gaat zoals bij Azure OpenAI (`ASSISTANT_ENABLED=false`). **Noodstop:** verwijder of
+beperk de sleutel in AI Studio; de app meldt dan "niet bereikbaar". **Sleutel vervangen:** nieuwe
+sleutel in AI Studio, dan G3 (`GEMINI_API_KEY`) en deployen.
+
+### Wisselen tussen Azure OpenAI en Gemini
+
+Zet beide diensten één keer in (A1–A5 en G1–G3). Sleutels en modellen staan dan naast elkaar
+(`OPENAI_*` en `GEMINI_*`); alleen **`AI_PROVIDER`** bepaalt welke dienst de app gebruikt.
+
+**Via de workflow (normaal):**
+
+```powershell
+gh variable set AI_PROVIDER --env production --body gemini   # of: openai
+gh workflow run ci-cd.yml --ref main -f deploy_azure=true
+```
+
+**Direct in Cloud Shell (zonder nieuwe build, ± 1 minuut):** kan alleen als de sleutel en het
+model van de andere dienst al op de Container App staan. Dat is zo na één deploy met beide
+ingesteld (de workflow zet altijd alle ingevulde `OPENAI_*`- en `GEMINI_*`-waarden mee); controleer
+het met de controle uit [A6](#a6--deployen-powershell). Ontbreken ze, dan start de app niet. Stop
+eerst de actieve revision (zie [Instellingen later wijzigen](#instellingen-later-wijzigen)), dan:
+
+```bash
+source ~/ashab.env; az account set --subscription $SUB
+for REV in $(az containerapp revision list -n $APPNAME -g $RG --query "[?properties.active].name" -o tsv); do
+  az containerapp revision deactivate -n $APPNAME -g $RG --revision $REV
+done
+sleep 20
+az containerapp update -n $APPNAME -g $RG --set-env-vars AI_PROVIDER=gemini   # of: openai
+```
+
+Zet daarna ook de GitHub-variabele (eerste blok), anders zet de volgende deploy de oude waarde
+terug.
+
+**Controle:**
+
+```bash
+az containerapp show -n $APPNAME -g $RG \
+  --query "properties.template.containers[0].env[?name=='AI_PROVIDER'].value" -o tsv
+az containerapp logs show -n $APPNAME -g $RG --tail 50 | grep Helpassistent
+```
+
+Stel daarna een vraag in de app (A7). Bij een fout noemt het log de dienst: *AI-dienst 'gemini'
+faalde* of *AI-dienst 'openai' faalde*.
+
 ### Troubleshooting deployment
 
 Algemene hulpmiddelen:
@@ -1314,6 +1681,15 @@ gh run rerun <run-id> --failed        # alleen de mislukte jobs opnieuw (zelfde 
 | `/.auth/me` geeft 404 | Token store van Easy Auth staat uit (standaard) | Niet nodig; issuer en subject uit de database halen (stap 9a) |
 | `/platform` geeft geen toegang | `SUPERADMIN_SUBJECTS` wijkt af (bijv. domein i.p.v. tenant-id in de issuer) | Waarde exact overnemen uit stap 9a, dan 9b |
 | Mollie-betalingen blijven op "open" staan | Easy Auth stuurt de webhook naar de inlogpagina | Pad `/betalingen/webhook/<slug>` toevoegen aan `--excluded-paths` (naast `/api/v1/health`); controle: `curl -s -o /dev/null -w "%{http_code}" -X POST $URL/betalingen/webhook/<slug>` geeft `200`, geen `302` |
+| Deploy stopt met "… ontbreekt" (bijv. "OPENAI_MODEL (of AI_MODEL) ontbreekt", "Secret GEMINI_API_KEY ontbreekt") | AI-instellingen voor de gekozen `AI_PROVIDER` onvolledig; de workflow stopt vóórdat de draaiende app wordt geraakt | [A5](#a5--instellingen-in-github-powershell-op-je-pc) of [G3](#g3--instellingen-in-github-powershell-op-je-pc) aanvullen en opnieuw deployen |
+| Deploy stopt met "ASSISTANT_… moet …" of "GEMINI_REASONING_EFFORT moet …" | Ongeldige waarde | Variabele op een geldige waarde zetten (zie [Configuratie](#configuratie)) en opnieuw deployen |
+| Geen menu-item **Assistent** na het aanzetten | `ASSISTANT_ENABLED` niet `true`, of `AI_PROVIDER` is `local` (log: *ASSISTANT_ENABLED=true, maar AI_PROVIDER=local*) | Controle van A6; variabelen uit A5 zetten en deployen |
+| Assistent meldt "De assistent is nu niet bereikbaar" | Log *Helpassistent: AI-dienst 'openai' faalde (…)*: `NotFoundError` = verkeerde `OPENAI_MODEL` (moet de **deploymentnaam** zijn) of `OPENAI_BASE_URL` zonder `/openai/v1/`; `AuthenticationError` = verkeerde sleutel; `RateLimitError` = capaciteit (TPM) op | Proefvraag uit A4; zo nodig `--sku-capacity` verhogen met `az cognitiveservices account deployment create` (zelfde naam) |
+| Idem met *AI-dienst 'gemini' faalde (…)* | `NotFoundError` = onbekend `GEMINI_MODEL`; `AuthenticationError`/`PermissionDeniedError` = verkeerde of beperkte sleutel; `RateLimitError` = quotum van het project op (of geen betaalaccount); `BadRequestError` = model kent `GEMINI_REASONING_EFFORT` niet (bijv. `none` bij Gemini 3) | Proefvraag uit G2 met dezelfde waarden; quotum in Google Cloud console → *IAM & Admin → Quotas* |
+| Lokaal of op Azure: app start niet, "GEMINI_API_KEY is verplicht bij AI_PROVIDER=gemini" | `AI_PROVIDER=gemini` gezet zonder sleutel op de Container App (bijv. direct gewisseld in Cloud Shell) | Terug naar de vorige `AI_PROVIDER` met de stappen uit [Wisselen](#wisselen-tussen-azure-openai-en-gemini), dan G3 en deployen |
+| Assistent meldt vaak "Ik kon geen betrouwbaar antwoord maken" | Het model ondersteunt geen structured outputs, of een redeneermodel gebruikt de tokens al voor het nadenken | Een model als `gpt-4.1-mini` of een Gemini Flash-Lite gebruiken, `GEMINI_REASONING_EFFORT` laag houden (`minimal`), of `ASSISTANT_MAX_OUTPUT_TOKENS` verhogen (max. 1500) |
+| `az cognitiveservices account deployment create`: model of SKU niet beschikbaar | Niet elk model heeft `DataZoneStandard` in elke regio | Lijst uit A3 bekijken; een andere versie of EU-regio kiezen |
+| `az cognitiveservices account create`: naam of subdomein bezet | De naam is wereldwijd uniek | Andere naam kiezen in A2 |
 
 ### Back-up en herstel
 

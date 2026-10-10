@@ -3,6 +3,9 @@
 {% block content %}
 <h1>Help</h1>
 <p>Deze handleiding toont alleen de onderdelen die u met uw rol kunt gebruiken.</p>
+{% if assistant_enabled %}
+<p class="info-bar">Staat uw antwoord er niet bij? <a href="{{ org }}/assistent">Vraag het de assistent</a>.</p>
+{% endif %}
 <nav aria-label="Inhoud handleiding" class="help-toc">
   {% for anchor, title in sections %}<a href="#{{ anchor }}">{{ title }}</a>{% endfor %}
 </nav>

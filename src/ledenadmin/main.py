@@ -13,12 +13,14 @@ from ledenadmin.auth.providers import build_auth_provider
 from ledenadmin.config import Settings, get_settings
 from ledenadmin.db import Database
 from ledenadmin.services.ai.insight_service import InsightService, build_insight_provider
+from ledenadmin.services.assistant.service import build_assistant
 from ledenadmin.services.category_service import CategoryService
 from ledenadmin.services.kvk_service import build_kvk_lookup
 from ledenadmin.services.mail_service import build_mail_transport
 from ledenadmin.services.organization_data_service import OrganizationDataService
 from ledenadmin.services.organization_service import ensure_default_organization
 from ledenadmin.services.payment_service import HttpMollieApi, SecretBox
+from ledenadmin.web import assistant as web_assistant
 from ledenadmin.web import dev as web_dev
 from ledenadmin.web import payments as web_payments
 from ledenadmin.web import platform as web_platform
@@ -60,6 +62,8 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.state.database = database
     app.state.auth_provider = build_auth_provider(settings)
     app.state.insights = InsightService(build_insight_provider(settings))
+    # None als de assistent uit staat; dan is hij nergens zichtbaar en geeft /assistent 404.
+    app.state.assistant = build_assistant(settings)
     app.state.templates = build_templates(settings.tz)
     app.state.kvk_lookup = build_kvk_lookup(settings.kvk_api_key, settings.kvk_api_url)
     app.state.secret_box = SecretBox(settings.secret_encryption_key)
@@ -84,6 +88,7 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     org.include_router(web_routes.router)
     org.include_router(web_users.org_router)
     org.include_router(web_payments.org_router)
+    org.include_router(web_assistant.router)
     app.include_router(org)
     app.include_router(web_users.public_router)
     app.include_router(web_payments.webhook_router)

@@ -103,6 +103,8 @@ def render(
         "organization": getattr(request.state, "organization", None),
         # Lokaal (dev-login): DEV-badge en de link om van gebruiker te wisselen.
         "local_mode": request.app.state.settings.auth_mode == AuthMode.DEV,
+        # Helpassistent: menu-item en verwijzing in Help alleen als hij aan staat.
+        "assistant_enabled": getattr(request.app.state, "assistant", None) is not None,
     }
     return request.app.state.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code

@@ -2,7 +2,7 @@ from enum import StrEnum
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,20 @@ class AIProviderName(StrEnum):
     LOCAL = "local"
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    GEMINI = "gemini"
+
+
+class GeminiReasoningEffort(StrEnum):
+    """Hoeveel Gemini 'nadenkt'; `none` kan alleen bij Gemini 2.5-modellen."""
+
+    NONE = "none"
+    MINIMAL = "minimal"
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+GEMINI_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 
 class Settings(BaseSettings):
@@ -63,16 +77,46 @@ class Settings(BaseSettings):
     # Alleen voor productie zonder Litestream, bijv. met een eigen back-up van een vast volume.
     allow_sqlite_in_production: bool = False
 
+    # Wisselen van AI-dienst = alleen AI_PROVIDER aanpassen: sleutels en modellen per dienst
+    # mogen naast elkaar blijven staan. <DIENST>_MODEL gaat voor op AI_MODEL.
     ai_provider: AIProviderName = AIProviderName.LOCAL
     ai_model: str | None = None
     ai_timeout_seconds: float = Field(default=20.0, gt=0)
     openai_api_key: str | None = None
     openai_base_url: str | None = None
+    openai_model: str | None = None
     anthropic_api_key: str | None = None
+    anthropic_model: str | None = None
+    gemini_api_key: str | None = None
+    gemini_model: str | None = None
+    gemini_base_url: str = GEMINI_OPENAI_BASE_URL
+    gemini_reasoning_effort: GeminiReasoningEffort | None = GeminiReasoningEffort.MINIMAL
+
+    # Helpassistent (US16): alleen actief met een externe AI-provider (zie assistant_active).
+    assistant_enabled: bool = False
+    assistant_daily_limit_per_user: int = Field(default=20, ge=1, le=100)
+    assistant_daily_limit_total: int = Field(default=300, ge=1, le=5000)
+    assistant_max_question_chars: int = Field(default=500, ge=50, le=1000)
+    assistant_max_output_tokens: int = Field(default=600, ge=100, le=1500)
 
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() == "production"
+
+    @property
+    def assistant_active(self) -> bool:
+        """De assistent staat aan én er is een externe AI-provider; anders is hij onzichtbaar."""
+        return self.assistant_enabled and self.ai_provider != AIProviderName.LOCAL
+
+    @property
+    def model(self) -> str | None:
+        """Het model voor de gekozen AI_PROVIDER: <DIENST>_MODEL, anders AI_MODEL."""
+        specific = {
+            AIProviderName.OPENAI: self.openai_model,
+            AIProviderName.ANTHROPIC: self.anthropic_model,
+            AIProviderName.GEMINI: self.gemini_model,
+        }.get(self.ai_provider)
+        return specific or self.ai_model
 
     @property
     def superadmins(self) -> frozenset[str]:
@@ -81,6 +125,12 @@ class Settings(BaseSettings):
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
+
+    @field_validator("gemini_reasoning_effort", mode="before")
+    @classmethod
+    def _empty_is_default_of_model(cls, value):
+        """Leeg = niets meesturen; Gemini gebruikt dan de standaard van het model."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @model_validator(mode="after")
     def _validate(self) -> "Settings":
@@ -97,12 +147,17 @@ class Settings(BaseSettings):
                 "SQLite in productie vereist een back-up: zet LITESTREAM_REPLICA_URL (Litestream, "
                 "zie README) of, met een eigen back-up, ALLOW_SQLITE_IN_PRODUCTION=true"
             )
-        if self.ai_provider != AIProviderName.LOCAL and not self.ai_model:
-            raise ValueError("AI_MODEL is verplicht voor een externe AI-provider")
+        if self.ai_provider != AIProviderName.LOCAL and not self.model:
+            raise ValueError(
+                f"AI_MODEL (of {self.ai_provider.upper()}_MODEL) is verplicht voor "
+                f"AI_PROVIDER={self.ai_provider}"
+            )
         if self.ai_provider == AIProviderName.OPENAI and not self.openai_api_key:
             raise ValueError("OPENAI_API_KEY is verplicht bij AI_PROVIDER=openai")
         if self.ai_provider == AIProviderName.ANTHROPIC and not self.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is verplicht bij AI_PROVIDER=anthropic")
+        if self.ai_provider == AIProviderName.GEMINI and not self.gemini_api_key:
+            raise ValueError("GEMINI_API_KEY is verplicht bij AI_PROVIDER=gemini")
         return self
 
 

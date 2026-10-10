@@ -40,7 +40,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-ledenadmin = ["web/templates/**/*.html", "web/static/**/*"]
+ledenadmin = ["web/templates/**/*.html", "web/static/**/*", "services/assistant/kennis/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]

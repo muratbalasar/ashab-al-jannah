@@ -1,0 +1,24 @@
+{% if reply %}
+{% if reply.notice %}
+<p class="{{ 'notice' if reply.refused else 'warning' }}" role="status">{{ reply.notice }}</p>
+{% else %}
+<article class="assistant-answer">
+  <header>Antwoord</header>
+  {% for block in reply.blocks %}
+  {% if block.kind == "ol" %}
+  <ol>{% for line in block.lines %}<li>{{ line }}</li>{% endfor %}</ol>
+  {% elif block.kind == "ul" %}
+  <ul>{% for line in block.lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% else %}
+  {% for line in block.lines %}<p>{{ line }}</p>{% endfor %}
+  {% endif %}
+  {% endfor %}
+  <footer><small>
+    {% if reply.sources %}Meer hierover:
+    {% for source in reply.sources %}{% if source.url %}<a href="{{ source.url }}">{{ source.title }}</a>{% else %}{{ source.title }}{% endif %}{% if not loop.last %}, {% endif %}{% endfor %}.
+    {% endif %}Antwoord van een AI-assistent; controleer bij twijfel de Help.
+  </small></footer>
+</article>
+{% endif %}
+{% endif %}
+<p class="assistant-remaining"><small>Nog {{ remaining }} van {{ assistant.per_user }} vragen vandaag.</small></p>

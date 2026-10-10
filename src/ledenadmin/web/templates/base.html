@@ -42,6 +42,7 @@
         {% if org and principal.can(Permission.USERS_MANAGE) %}{{ item(org ~ '/gebruikers', 'Gebruikers') }}{% endif %}
         {% if org and principal.can(Permission.ORGANIZATION_MANAGE) %}{{ item(org ~ '/instellingen', 'Instellingen') }}{% endif %}
         {% if principal.is_superadmin %}{{ item('/platform', 'Platform') }}{% endif %}
+        {% if org and assistant_enabled %}{{ item(org ~ '/assistent', 'Assistent') }}{% endif %}
         {% if org %}{{ item(org ~ '/help', 'Help') }}{% endif %}
       </ul>
       <ul>
