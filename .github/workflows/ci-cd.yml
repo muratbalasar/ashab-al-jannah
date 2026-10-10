@@ -323,7 +323,11 @@ jobs:
   # Vereiste variabele (Settings → Variables, environment "production"):
   #   LITESTREAM_REPLICA_URL – back-up van de SQLite-database, abs://<opslagaccount>@<container>/<pad>
   #   (de managed identity van de app heeft "Storage Blob Data Contributor"; zie README)
-  # Optioneel: AI_PROVIDER, AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL, ANTHROPIC_API_KEY
+  # Optioneel (AI, zie README "AI-dienst kiezen"): variabele AI_PROVIDER (local, openai, gemini of
+  #   anthropic) kiest de dienst. Per dienst: OPENAI_MODEL + OPENAI_BASE_URL + secret
+  #   OPENAI_API_KEY; GEMINI_MODEL (+ GEMINI_REASONING_EFFORT) + secret GEMINI_API_KEY;
+  #   ANTHROPIC_MODEL + secret ANTHROPIC_API_KEY. AI_MODEL geldt als <DIENST>_MODEL leeg is.
+  #   Alles mag naast elkaar staan: wisselen = alleen AI_PROVIDER aanpassen en deployen.
   # Helpassistent (US16): ASSISTANT_ENABLED=true (vereist een externe AI_PROVIDER) en optioneel
   #   ASSISTANT_DAILY_LIMIT_PER_USER, ASSISTANT_DAILY_LIMIT_TOTAL, ASSISTANT_MAX_QUESTION_CHARS,
   #   ASSISTANT_MAX_OUTPUT_TOKENS; zie README "Helpassistent aanzetten".
@@ -363,9 +367,14 @@ jobs:
           LITESTREAM_REPLICA_URL: ${{ vars.LITESTREAM_REPLICA_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AI_PROVIDER: ${{ vars.AI_PROVIDER || 'local' }}
           AI_MODEL: ${{ vars.AI_MODEL }}
+          OPENAI_MODEL: ${{ vars.OPENAI_MODEL }}
           OPENAI_BASE_URL: ${{ vars.OPENAI_BASE_URL }}
+          ANTHROPIC_MODEL: ${{ vars.ANTHROPIC_MODEL }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          GEMINI_REASONING_EFFORT: ${{ vars.GEMINI_REASONING_EFFORT }}
           ASSISTANT_ENABLED: ${{ vars.ASSISTANT_ENABLED || 'false' }}
           ASSISTANT_DAILY_LIMIT_PER_USER: ${{ vars.ASSISTANT_DAILY_LIMIT_PER_USER }}
           ASSISTANT_DAILY_LIMIT_TOTAL: ${{ vars.ASSISTANT_DAILY_LIMIT_TOTAL }}
@@ -376,15 +385,28 @@ jobs:
           : "${LITESTREAM_REPLICA_URL:?Zet de variabele LITESTREAM_REPLICA_URL (zie README, Deployment)}"
           # Controleer de AI-instellingen vóórdat de oude container stopt: met een fout start de
           # nieuwe niet en is de app onbereikbaar.
+          AI_PROVIDER=$(echo "$AI_PROVIDER" | tr '[:upper:]' '[:lower:]')
           case "$AI_PROVIDER" in
             local) ;;
-            openai) : "${AI_MODEL:?AI_MODEL ontbreekt}" "${OPENAI_API_KEY:?Secret OPENAI_API_KEY ontbreekt}" ;;
-            anthropic) : "${AI_MODEL:?AI_MODEL ontbreekt}" "${ANTHROPIC_API_KEY:?Secret ANTHROPIC_API_KEY ontbreekt}" ;;
-            *) echo "::error::Onbekende AI_PROVIDER '$AI_PROVIDER' (local, openai of anthropic)"; exit 1 ;;
+            openai)
+              : "${OPENAI_API_KEY:?Secret OPENAI_API_KEY ontbreekt}"
+              : "${OPENAI_MODEL:-${AI_MODEL:?OPENAI_MODEL (of AI_MODEL) ontbreekt}}" ;;
+            gemini)
+              : "${GEMINI_API_KEY:?Secret GEMINI_API_KEY ontbreekt}"
+              : "${GEMINI_MODEL:-${AI_MODEL:?GEMINI_MODEL (of AI_MODEL) ontbreekt}}" ;;
+            anthropic)
+              : "${ANTHROPIC_API_KEY:?Secret ANTHROPIC_API_KEY ontbreekt}"
+              : "${ANTHROPIC_MODEL:-${AI_MODEL:?ANTHROPIC_MODEL (of AI_MODEL) ontbreekt}}" ;;
+            *) echo "::error::Onbekende AI_PROVIDER '$AI_PROVIDER' (local, openai, gemini of anthropic)"; exit 1 ;;
+          esac
+          GEMINI_REASONING_EFFORT=$(echo "$GEMINI_REASONING_EFFORT" | tr '[:upper:]' '[:lower:]')
+          case "$GEMINI_REASONING_EFFORT" in
+            ""|none|minimal|low|medium|high) ;;
+            *) echo "::error::GEMINI_REASONING_EFFORT moet none, minimal, low, medium of high zijn (nu: '$GEMINI_REASONING_EFFORT')"; exit 1 ;;
           esac
           ASSISTANT_ENABLED=$(echo "$ASSISTANT_ENABLED" | tr '[:upper:]' '[:lower:]')
           if [ "$ASSISTANT_ENABLED" = "true" ] && [ "$AI_PROVIDER" = "local" ]; then
-            echo "::warning::ASSISTANT_ENABLED=true werkt alleen met AI_PROVIDER=openai of anthropic; de assistent blijft uit."
+            echo "::warning::ASSISTANT_ENABLED=true werkt alleen met AI_PROVIDER=openai, gemini of anthropic; de assistent blijft uit."
           fi
           # Ongeldige waarden laten de app niet starten: hier al weigeren (grenzen als in config.py).
           case "$ASSISTANT_ENABLED" in
@@ -406,11 +428,11 @@ jobs:
                     ASSISTANT_ENABLED="$ASSISTANT_ENABLED")
           SECRETS=()
           for NAME in ASSISTANT_DAILY_LIMIT_PER_USER ASSISTANT_DAILY_LIMIT_TOTAL \
-                      ASSISTANT_MAX_QUESTION_CHARS ASSISTANT_MAX_OUTPUT_TOKENS; do
+                      ASSISTANT_MAX_QUESTION_CHARS ASSISTANT_MAX_OUTPUT_TOKENS \
+                      AI_MODEL OPENAI_MODEL OPENAI_BASE_URL ANTHROPIC_MODEL \
+                      GEMINI_MODEL GEMINI_REASONING_EFFORT; do
             if [ -n "${!NAME}" ]; then ENV_VARS+=("$NAME=${!NAME}"); fi
           done
-          if [ -n "$AI_MODEL" ]; then ENV_VARS+=(AI_MODEL="$AI_MODEL"); fi
-          if [ -n "$OPENAI_BASE_URL" ]; then ENV_VARS+=(OPENAI_BASE_URL="$OPENAI_BASE_URL"); fi
           if [ -n "$OPENAI_API_KEY" ]; then
             SECRETS+=(openai-api-key="$OPENAI_API_KEY")
             ENV_VARS+=(OPENAI_API_KEY=secretref:openai-api-key)
@@ -418,6 +440,10 @@ jobs:
           if [ -n "$ANTHROPIC_API_KEY" ]; then
             SECRETS+=(anthropic-api-key="$ANTHROPIC_API_KEY")
             ENV_VARS+=(ANTHROPIC_API_KEY=secretref:anthropic-api-key)
+          fi
+          if [ -n "$GEMINI_API_KEY" ]; then
+            SECRETS+=(gemini-api-key="$GEMINI_API_KEY")
+            ENV_VARS+=(GEMINI_API_KEY=secretref:gemini-api-key)
           fi
 
           # SQLite met Litestream: altijd precies één container (twee schrijvers = corrupte data).

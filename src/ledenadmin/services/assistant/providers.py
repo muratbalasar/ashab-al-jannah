@@ -1,6 +1,6 @@
 """Koppelingen met de AI-dienst voor de helpassistent.
 
-Beide providers krijgen de instructies (met de kennis) apart van de vraag, een harde grens
+Alle providers krijgen de instructies (met de kennis) apart van de vraag, een harde grens
 op het aantal antwoordtokens en moeten één JSON-object teruggeven volgens `schema`.
 """
 
@@ -89,16 +89,75 @@ class AnthropicAssistantProvider:
         ).strip()
 
 
+class GeminiAssistantProvider:
+    """Google Gemini via het OpenAI-compatibele endpoint (Chat Completions) met structured output.
+
+    De Responses API en `store` bestaan daar niet; de gratis laag van Gemini mag vragen
+    gebruiken om modellen te verbeteren (zie README).
+    """
+
+    name = "gemini"
+
+    def __init__(self, client, model: str, reasoning_effort: str | None = None) -> None:
+        self._client = client
+        self._model = model
+        self._reasoning_effort = reasoning_effort
+
+    @classmethod
+    def create(
+        cls,
+        api_key: str,
+        model: str,
+        base_url: str,
+        timeout: float,
+        reasoning_effort: str | None,
+    ):
+        from openai import OpenAI
+
+        return cls(
+            OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=1),
+            model,
+            reasoning_effort,
+        )
+
+    def complete(
+        self, instructions: str, question: str, schema: dict, max_output_tokens: int
+    ) -> str:
+        extra = {"reasoning_effort": self._reasoning_effort} if self._reasoning_effort else {}
+        response = self._client.chat.completions.create(
+            model=self._model,
+            messages=[
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": question},
+            ],
+            max_tokens=max_output_tokens,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "assistent_antwoord", "schema": schema, "strict": True},
+            },
+            **extra,
+        )
+        return (response.choices[0].message.content or "").strip()
+
+
 def build_assistant_provider(settings: Settings) -> AssistantProvider:
     if settings.ai_provider == AIProviderName.ANTHROPIC:
         return AnthropicAssistantProvider.create(
             api_key=settings.anthropic_api_key,
-            model=settings.ai_model,
+            model=settings.model,
             timeout=settings.ai_timeout_seconds,
+        )
+    if settings.ai_provider == AIProviderName.GEMINI:
+        return GeminiAssistantProvider.create(
+            api_key=settings.gemini_api_key,
+            model=settings.model,
+            base_url=settings.gemini_base_url,
+            timeout=settings.ai_timeout_seconds,
+            reasoning_effort=settings.gemini_reasoning_effort,
         )
     return OpenAIAssistantProvider.create(
         api_key=settings.openai_api_key,
-        model=settings.ai_model,
+        model=settings.model,
         base_url=settings.openai_base_url,
         timeout=settings.ai_timeout_seconds,
     )

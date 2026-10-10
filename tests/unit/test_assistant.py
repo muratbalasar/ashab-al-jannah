@@ -11,7 +11,7 @@ from test_my import add_member, link_lid
 from test_users import add_org
 
 from ledenadmin.auth.principal import Identity
-from ledenadmin.config import AIProviderName, Settings
+from ledenadmin.config import GEMINI_OPENAI_BASE_URL, AIProviderName, Settings
 from ledenadmin.domain.models import AssistantUsage, AuditLog
 from ledenadmin.services.assistant import service as assistant_service
 from ledenadmin.services.assistant.knowledge import (
@@ -21,6 +21,7 @@ from ledenadmin.services.assistant.knowledge import (
 )
 from ledenadmin.services.assistant.providers import (
     AnthropicAssistantProvider,
+    GeminiAssistantProvider,
     OpenAIAssistantProvider,
     build_assistant_provider,
 )
@@ -150,6 +151,56 @@ def test_provider_factory_chooses_anthropic() -> None:
     assert isinstance(build_assistant_provider(settings), AnthropicAssistantProvider)
 
 
+def test_provider_factory_chooses_gemini_with_openai_compatible_endpoint() -> None:
+    settings = Settings(
+        _env_file=None,
+        ai_provider=AIProviderName.GEMINI,
+        gemini_model="gemini-flash",
+        gemini_api_key="sleutel",
+    )
+    provider = build_assistant_provider(settings)
+
+    assert isinstance(provider, GeminiAssistantProvider)
+    assert provider._model == "gemini-flash" and provider._reasoning_effort == "minimal"
+    assert str(provider._client.base_url) == GEMINI_OPENAI_BASE_URL
+
+
+def test_switching_provider_only_needs_ai_provider() -> None:
+    """Sleutels en modellen van beide diensten staan naast elkaar; AI_PROVIDER kiest."""
+    both = {
+        "_env_file": None,
+        "ai_model": "oud-model",
+        "openai_api_key": "azure-sleutel",
+        "openai_base_url": "https://voorbeeld.openai.azure.com/openai/v1/",
+        "openai_model": "assistent",
+        "gemini_api_key": "gemini-sleutel",
+        "gemini_model": "gemini-flash",
+    }
+
+    azure = Settings(**both, ai_provider=AIProviderName.OPENAI)
+    gemini = Settings(**both, ai_provider=AIProviderName.GEMINI)
+
+    assert azure.model == "assistent"
+    assert isinstance(build_assistant_provider(azure), OpenAIAssistantProvider)
+    assert gemini.model == "gemini-flash"
+    assert isinstance(build_assistant_provider(gemini), GeminiAssistantProvider)
+    # Zonder <DIENST>_MODEL geldt AI_MODEL (bestaande installaties blijven werken).
+    assert Settings(**{**both, "openai_model": None}, ai_provider="openai").model == "oud-model"
+
+
+def test_gemini_needs_key_and_model_and_valid_reasoning_effort() -> None:
+    with pytest.raises(ValidationError, match="GEMINI_API_KEY"):
+        Settings(_env_file=None, ai_provider=AIProviderName.GEMINI, gemini_model="g")
+    with pytest.raises(ValidationError, match="GEMINI_MODEL"):
+        Settings(_env_file=None, ai_provider=AIProviderName.GEMINI, gemini_api_key="k")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, gemini_reasoning_effort="veel")
+    assert Settings(_env_file=None, gemini_reasoning_effort="").gemini_reasoning_effort is None
+    assert (
+        Settings(_env_file=None, gemini_reasoning_effort="none").gemini_reasoning_effort == "none"
+    )
+
+
 # ── Providers ────────────────────────────────────────────────────────────────
 
 
@@ -197,6 +248,40 @@ def test_anthropic_provider_puts_schema_in_system_prompt() -> None:
     assert calls["max_tokens"] == 222
     assert calls["system"].startswith("instructies") and '"type": "object"' in calls["system"]
     assert calls["messages"] == [{"role": "user", "content": "vraag"}]
+
+
+def gemini_client(calls: dict, content: str | None):
+    def create(**kwargs):
+        calls.update(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=content))])
+
+    return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+
+def test_gemini_provider_uses_chat_completions_with_strict_schema() -> None:
+    calls = {}
+    provider = GeminiAssistantProvider(gemini_client(calls, ' {"g": 1} '), "gm", "minimal")
+    schema = {"type": "object"}
+
+    assert provider.complete("instructies", "vraag", schema, 333) == '{"g": 1}'
+    assert calls["model"] == "gm" and calls["max_tokens"] == 333
+    assert calls["reasoning_effort"] == "minimal"
+    assert calls["messages"] == [
+        {"role": "system", "content": "instructies"},
+        {"role": "user", "content": "vraag"},
+    ]
+    assert calls["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {"name": "assistent_antwoord", "schema": schema, "strict": True},
+    }
+
+
+def test_gemini_provider_without_reasoning_effort_sends_none_and_handles_empty_reply() -> None:
+    calls = {}
+    provider = GeminiAssistantProvider(gemini_client(calls, None), "gm")
+
+    assert provider.complete("i", "v", {}, 100) == ""
+    assert "reasoning_effort" not in calls
 
 
 # ── Hulpfuncties ─────────────────────────────────────────────────────────────

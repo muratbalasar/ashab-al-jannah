@@ -53,7 +53,7 @@ def build_insight_provider(settings: Settings) -> InsightProvider:
 
             return OpenAIInsightProvider.create(
                 api_key=settings.openai_api_key,
-                model=settings.ai_model,
+                model=settings.model,
                 base_url=settings.openai_base_url,
                 timeout=settings.ai_timeout_seconds,
             )
@@ -62,8 +62,18 @@ def build_insight_provider(settings: Settings) -> InsightProvider:
 
             return AnthropicInsightProvider.create(
                 api_key=settings.anthropic_api_key,
-                model=settings.ai_model,
+                model=settings.model,
                 timeout=settings.ai_timeout_seconds,
+            )
+        case AIProviderName.GEMINI:
+            from ledenadmin.services.ai.gemini_provider import GeminiInsightProvider
+
+            return GeminiInsightProvider.create(
+                api_key=settings.gemini_api_key,
+                model=settings.model,
+                base_url=settings.gemini_base_url,
+                timeout=settings.ai_timeout_seconds,
+                reasoning_effort=settings.gemini_reasoning_effort,
             )
         case _:
             return RuleBasedInsightProvider()

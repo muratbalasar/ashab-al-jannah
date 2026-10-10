@@ -10,6 +10,7 @@ from ledenadmin.config import AIProviderName, Settings
 from ledenadmin.schemas.reports import ReportFilter
 from ledenadmin.services.ai.anthropic_provider import AnthropicInsightProvider
 from ledenadmin.services.ai.base import InsightInput
+from ledenadmin.services.ai.gemini_provider import GeminiInsightProvider
 from ledenadmin.services.ai.insight_service import (
     NO_DATA,
     InsightService,
@@ -110,6 +111,32 @@ def test_anthropic_provider_joins_text_blocks(report) -> None:
     text = AnthropicInsightProvider(client, "claude-x").generate(InsightInput.from_report(report))
 
     assert text == "- a"
+
+
+def test_gemini_provider_sends_only_aggregates_via_chat_completions(report) -> None:
+    calls = {}
+
+    def create(**kwargs):
+        calls.update(kwargs)
+        message = SimpleNamespace(content=" - trend ")
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    text = GeminiInsightProvider(client, "gemini-x", "minimal").generate(
+        InsightInput.from_report(report)
+    )
+
+    assert text == "- trend"
+    assert calls["model"] == "gemini-x" and calls["reasoning_effort"] == "minimal"
+    assert "Jan Jansen" not in calls["messages"][1]["content"]
+
+
+def test_factory_builds_gemini_provider() -> None:
+    settings = Settings(
+        _env_file=None, ai_provider=AIProviderName.GEMINI, ai_model="g", gemini_api_key="k"
+    )
+
+    assert isinstance(build_insight_provider(settings), GeminiInsightProvider)
 
 
 def test_empty_external_response_triggers_fallback(report) -> None:

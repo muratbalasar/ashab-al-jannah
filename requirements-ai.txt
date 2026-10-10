@@ -1,3 +1,4 @@
-# Optionele externe AI-providers (alleen nodig bij AI_PROVIDER=openai of anthropic).
+# Optionele externe AI-providers (alleen nodig bij AI_PROVIDER=openai, gemini of anthropic).
+# Gemini gebruikt het pakket openai (OpenAI-compatibel endpoint van Google).
 openai==3.24.0
 anthropic==1.11.0

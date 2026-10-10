@@ -15,7 +15,8 @@ Hosting en deploy:
 Belangrijke instellingen:
 - APP_ENV=production, AUTH_MODE=easyauth, LITESTREAM_REPLICA_URL (verplicht voor de back-up), PUBLIC_BASE_URL (links in e-mails).
 - MAX_ORGANIZATIONS_PER_USER (standaard 3), BREVO_API_KEY en MAIL_SENDER_EMAIL (e-mail), KVK_API_KEY (KVK-controle), SECRET_ENCRYPTION_KEY (Mollie-sleutels; kwijt = alle stichtingen moeten Mollie opnieuw koppelen).
-- AI: AI_PROVIDER (local, openai of anthropic), AI_MODEL, OPENAI_API_KEY, OPENAI_BASE_URL (Azure OpenAI: https://<resource>.openai.azure.com/openai/v1/).
+- AI: AI_PROVIDER kiest de dienst: local, openai (ook Azure OpenAI), gemini (Google Gemini) of anthropic. Per dienst een sleutel en model: OPENAI_API_KEY, OPENAI_BASE_URL (Azure OpenAI: https://<resource>.openai.azure.com/openai/v1/) en OPENAI_MODEL; GEMINI_API_KEY, GEMINI_MODEL en GEMINI_REASONING_EFFORT (standaard minimal); ANTHROPIC_API_KEY en ANTHROPIC_MODEL. AI_MODEL geldt als het model van de dienst leeg is.
+- Wisselen tussen Azure OpenAI en Gemini: zet beide sleutels en modellen, en pas alleen AI_PROVIDER aan (GitHub-variabele en deployen). Voor Gemini in een app met gebruikers in de EU is een betaalaccount bij Google verplicht.
 - Assistent: ASSISTANT_ENABLED=true werkt alleen met een externe AI_PROVIDER. Limieten: ASSISTANT_DAILY_LIMIT_PER_USER (standaard 20), ASSISTANT_DAILY_LIMIT_TOTAL (standaard 300), ASSISTANT_MAX_QUESTION_CHARS (500), ASSISTANT_MAX_OUTPUT_TOKENS (600).
 
 Veelvoorkomende problemen:
@@ -23,4 +24,4 @@ Veelvoorkomende problemen:
 - Na inloggen een fout of een lus: issuer, client-id of client secret van Easy Auth klopt niet.
 - /platform geeft geen toegang: SUPERADMIN_SUBJECTS wijkt af; de issuer begint met het tenant-id.
 - Mollie-betalingen blijven open: de webhook /betalingen/webhook/<slug> moet zonder inloggen bereikbaar zijn.
-- Assistent zegt "niet bereikbaar": controleer AI_MODEL (naam van de deployment), OPENAI_BASE_URL, de sleutel en het quotum van de Azure OpenAI-deployment.
+- Assistent zegt "niet bereikbaar": controleer in het log welke dienst faalde. Azure OpenAI: OPENAI_MODEL (naam van de deployment), OPENAI_BASE_URL, de sleutel en het quotum. Gemini: GEMINI_MODEL, GEMINI_API_KEY, het quotum en het betaalaccount van het Google-project.
