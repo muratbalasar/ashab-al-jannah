@@ -957,9 +957,11 @@ want in stap 4 en 7 wijs je rollen toe.
 
 #### Stap 0 – Variabelen vastleggen (Cloud Shell)
 
-Variabelen in Cloud Shell verdwijnen als de browser herlaadt; je home-map blijft wel
-bewaard. Daarom staan alle niet-geheime waarden in `~/ashab.env`. Begin elke nieuwe
-Cloud Shell-sessie met `source ~/ashab.env`.
+Variabelen in Cloud Shell verdwijnen als de browser herlaadt. Daarom staan alle niet-geheime
+waarden in `~/ashab.env`. Begin elke nieuwe Cloud Shell-sessie met `source ~/ashab.env`.
+De home-map blijft alleen bewaard met een gekoppeld opslagaccount; in een tijdelijke sessie
+(*ephemeral*) of in een andere directory (bijv. de externe tenant uit stap 8) is het bestand weg.
+Maak het dan opnieuw met [ashab.env herstellen](#ashabenv-herstellen).
 
 Kies een naam voor het opslagaccount: wereldwijd uniek, 3–24 kleine letters of cijfers.
 
@@ -982,6 +984,37 @@ source ~/ashab.env; cat ~/ashab.env
 kies dan eerst het juiste met `az account set --subscription <naam-of-id>` en maak het bestand
 opnieuw. `RG`, `LOC` en `APPNAME` moeten gelijk zijn aan de `env:`-waarden in
 [ci-cd.yml](./.github/workflows/ci-cd.yml).
+
+##### ashab.env herstellen
+
+Is `~/ashab.env` verdwenen na de eerste deployment? Controleer eerst met
+`az account show --query "{tenant:tenantId, abonnement:name}" -o table` dat Cloud Shell in je
+gewone directory met abonnement draait (anders in de portal: tandwiel → *Directory's en
+abonnementen* → **Overschakelen**, en Cloud Shell opnieuw openen). Haal de waarden dan uit Azure:
+
+```bash
+az extension add --name containerapp --upgrade --only-show-errors
+RG=rg-ashab-al-jannah; APPNAME=ashab-al-jannah
+az storage account list -g $RG --query "[].name" -o tsv      # het opslagaccount van stap 3
+cat > ~/ashab.env <<EOF
+RG=$RG
+LOC=westeurope
+APPNAME=$APPNAME
+SA=$(az storage account list -g $RG --query "[0].name" -o tsv)
+GH_REPO=<github-eigenaar>/ashab-al-jannah
+SUB=$(az account show --query id -o tsv)
+TENANT=$(az account show --query tenantId -o tsv)
+GITHUB_APP=$(az ad app list --display-name github-ashab-al-jannah --query "[0].appId" -o tsv)
+URL=https://$(az containerapp show -n $APPNAME -g $RG --query properties.configuration.ingress.fqdn -o tsv)
+AOAI=$(az cognitiveservices account list -g $RG --query "[?kind=='OpenAI'] | [0].name" -o tsv)
+AOAI_LOC=$(az cognitiveservices account list -g $RG --query "[?kind=='OpenAI'] | [0].location" -o tsv)
+EOF
+source ~/ashab.env; cat ~/ashab.env
+```
+
+`AOAI` en `AOAI_LOC` blijven leeg zolang de [helpassistent](#helpassistent-aanzetten-azure-openai)
+niet is ingesteld. Altijd een bewaarde home-map: Cloud Shell-werkbalk → *Instellingen →
+Gebruikersinstellingen opnieuw instellen*, en bij het opstarten **Opslagaccount koppelen**.
 
 #### Stap 1 – Resource group (Cloud Shell)
 
@@ -1400,15 +1433,28 @@ printf 'AOAI=%s\nAOAI_LOC=%s\n' $AOAI $AOAI_LOC >> ~/ashab.env
 #### A3 – Model deployen met harde grenzen (Cloud Shell)
 
 Gebruik een **klein chatmodel zonder redeneerstap dat structured outputs ondersteunt**,
-bijvoorbeeld `gpt-4.1-mini`. Bekijk welke versies en SKU's er in de regio zijn:
+bijvoorbeeld `gpt-4.1-mini`. Bekijk welke versies en SKU's er in de regio zijn, met de datum
+waarop Azure het model uitfaseert:
 
 ```bash
-az cognitiveservices model list -l $AOAI_LOC \
-  --query "[?model.name=='gpt-4.1-mini'].{versie:model.version, skus:join(',', model.skus[].name)}" -o table
+az cognitiveservices model list -l $AOAI_LOC --query "[?kind=='OpenAI' && (contains(model.name,'mini') || contains(model.name,'nano')) && contains(join(',', model.skus[].name), 'DataZoneStandard')].{model:model.name, versie:model.version, uitfasering:model.deprecation.inference}" -o table
 ```
 
-Deploy met SKU **`DataZoneStandard`**: de verwerking blijft dan binnen de EU. Kies de versie uit
-de lijst hierboven.
+> Na de uitfaseringsdatum werkt de deployment niet meer (de app meldt "niet bereikbaar").
+> Zet die datum in je agenda en deploy op tijd een nieuwer model onder dezelfde
+> deploymentnaam, of een nieuwe naam en pas dan `OPENAI_MODEL` aan (A5).
+> Nieuwe deployments kunnen al maanden eerder geblokkeerd zijn (*ServiceModelDeprecated*,
+> bijv. `gpt-4o-mini` sinds 31-03-2026); kies dus het nieuwste model uit de lijst.
+>
+> Een nieuw abonnement zit vaak in de *Free Tier* van Azure OpenAI, zonder quotum voor directe
+> verwerking (*InsufficientQuota*, *quota limit is 0*). Vraag dan eerst quotum aan via
+> [aka.ms/oai/stuquotarequest](https://aka.ms/oai/stuquotarequest) (model, *Data Zone Standard*,
+> 20.000 TPM) of gebruik intussen [Gemini](#helpassistent-met-google-gemini); zie
+> [Troubleshooting](#troubleshooting-deployment).
+
+Deploy met SKU **`DataZoneStandard`**: de verwerking blijft dan binnen de EU. Vervang
+`<versie>` door de versie uit de lijst hierboven, zonder `<` en `>` (anders geeft bash
+*No such file or directory*).
 
 ```bash
 az cognitiveservices account deployment create -n $AOAI -g $RG \
@@ -1519,6 +1565,16 @@ az containerapp show -n $APPNAME -g $RG \
   `az cognitiveservices account deployment delete -n $AOAI -g $RG --deployment-name assistent`.
 - **Sleutel vervangen** (bijvoorbeeld na een lek): `az cognitiveservices account keys regenerate
   -n $AOAI -g $RG --key-name key1`, dan A5 (`OPENAI_API_KEY`) en A6.
+- **Volledig verwijderen** (eerst uitzetten zoals hierboven, als de app hem gebruikt):
+
+  ```bash
+  az cognitiveservices account delete -n $AOAI -g $RG
+  az cognitiveservices account purge  -n $AOAI -g $RG -l $AOAI_LOC   # anders 48 uur in de prullenbak, naam bezet
+  sed -i '/^AOAI/d' ~/ashab.env
+  ```
+
+  Controle: `az cognitiveservices account list -g $RG -o table` en
+  `az cognitiveservices account list-deleted --query "[].name" -o tsv` tonen hem niet meer.
 
 ### Helpassistent met Google Gemini
 
@@ -1665,7 +1721,7 @@ gh run rerun <run-id> --failed        # alleen de mislukte jobs opnieuw (zelfde 
 
 | Symptoom | Oorzaak | Oplossing |
 |---|---|---|
-| `ERROR: argument --name/-n: expected one argument` | Cloud Shell is herladen; variabelen zijn leeg | `source ~/ashab.env` en opnieuw |
+| `ERROR: argument --name/-n: expected one argument` | Cloud Shell is herladen; variabelen zijn leeg | `source ~/ashab.env` en opnieuw; bestand weg? [ashab.env herstellen](#ashabenv-herstellen) |
 | `AuthorizationFailure` bij `az storage container create` | Owner heeft geen rechten op blobgegevens | `az storage container-rm create` (stap 3) |
 | Deploy-job: `AADSTS700213: No matching federated identity record found for presented assertion subject '...'` | Subject in Entra wijkt af van wat GitHub stuurt | Kopieer het subject uit de foutmelding en werk de credential bij: `az ad app federated-credential update --id $GITHUB_APP --federated-credential-id github-production --parameters '{"name":"github-production","issuer":"https://token.actions.githubusercontent.com","subject":"<subject>","audiences":["api://AzureADTokenExchange"]}'`; dan `gh run rerun <run-id> --failed` |
 | Deploy-job: `MissingSubscriptionRegistration` of geen rechten op `Microsoft.App/register` | Resource providers niet geregistreerd | Stap 2 |
@@ -1689,6 +1745,9 @@ gh run rerun <run-id> --failed        # alleen de mislukte jobs opnieuw (zelfde 
 | Lokaal of op Azure: app start niet, "GEMINI_API_KEY is verplicht bij AI_PROVIDER=gemini" | `AI_PROVIDER=gemini` gezet zonder sleutel op de Container App (bijv. direct gewisseld in Cloud Shell) | Terug naar de vorige `AI_PROVIDER` met de stappen uit [Wisselen](#wisselen-tussen-azure-openai-en-gemini), dan G3 en deployen |
 | Assistent meldt vaak "Ik kon geen betrouwbaar antwoord maken" | Het model ondersteunt geen structured outputs, of een redeneermodel gebruikt de tokens al voor het nadenken | Een model als `gpt-4.1-mini` of een Gemini Flash-Lite gebruiken, `GEMINI_REASONING_EFFORT` laag houden (`minimal`), of `ASSISTANT_MAX_OUTPUT_TOKENS` verhogen (max. 1500) |
 | `az cognitiveservices account deployment create`: model of SKU niet beschikbaar | Niet elk model heeft `DataZoneStandard` in elke regio | Lijst uit A3 bekijken; een andere versie of EU-regio kiezen |
+| `InsufficientQuota` … *quota limit is 0* bij `deployment create` | Abonnement in de *Free Tier* van Azure OpenAI: geen quotum voor directe verwerking van dit model/type (controle: `az rest --method get --url "https://management.azure.com/subscriptions/$SUB/providers/Microsoft.CognitiveServices/quotaTiers?api-version=2025-10-01-preview" --query "value[].properties.currentTierName" -o tsv`) | Quotum zoeken: `set +H`, dan `` az cognitiveservices usage list -l $AOAI_LOC --query "[?limit > `0` && starts_with(name.value,'OpenAI.') && !contains(name.value,'Batch')].{quotum:name.value, limiet:limit}" -o table ``. Staat er een bruikbaar chatmodel met `Standard` of `DataZoneStandard` > 0 (geen `-finetune`), deploy dat dan met die `--sku-name` (`Standard` = regionaal, verwerking blijft in de regio). Anders quotum aanvragen via [aka.ms/oai/stuquotarequest](https://aka.ms/oai/stuquotarequest) of intussen [Gemini](#helpassistent-met-google-gemini) |
+| `ServiceModelDeprecated` bij `deployment create` | Voor dit model worden geen nieuwe deployments meer gemaakt, ook al werkt het voor bestaande nog tot de uitfaseringsdatum | Een nieuwer model kiezen (lijst uit A3) |
+| `bash: !contains: event not found` | Bash leest `!` binnen dubbele aanhalingstekens als geschiedenis-opdracht | Ctrl+C, dan `set +H` en het commando opnieuw |
 | `az cognitiveservices account create`: naam of subdomein bezet | De naam is wereldwijd uniek | Andere naam kiezen in A2 |
 
 ### Back-up en herstel
