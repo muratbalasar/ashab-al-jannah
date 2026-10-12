@@ -4,7 +4,7 @@
 # litestream.yml en docker-entrypoint.sh). We bouwen de release-tag zelf: de officiële binary
 # bevat Go-modules met bekende kwetsbaarheden (Trivy). Alleen die modules worden bijgewerkt;
 # bij een nieuwe Litestream-release kan deze lijst kleiner worden of vervallen.
-FROM --platform=$BUILDPLATFORM golang:1.26 AS litestream
+FROM --platform=$BUILDPLATFORM golang:1.27 AS litestream
 ARG LITESTREAM_VERSION=0.5.17
 ARG LITESTREAM_COMMIT=ccd326c175b583b5e82893a6078f06dcef5fba3f
 ARG TARGETARCH
