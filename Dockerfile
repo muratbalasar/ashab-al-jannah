@@ -17,7 +17,7 @@ RUN go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 google.golang.or
     && CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH:-amd64}" go build -trimpath \
         -ldflags "-s -w -X main.Version=${LITESTREAM_VERSION}" -o /out/litestream ./cmd/litestream
 
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
