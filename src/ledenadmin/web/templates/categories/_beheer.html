@@ -55,12 +55,12 @@
 <div id="categorie-beheer" hx-target="#categorie-beheer" hx-swap="outerHTML">
   {% if beheer_melding %}<p class="notice" role="status">{{ beheer_melding }}</p>{% endif %}
   <div class="new-category">
-    {{ name_form(state, "nieuwe-categorie", "/categorieen", "", "Nieuwe categorie", "Toevoegen", editing == "nieuwe-categorie") }}
+    {{ name_form(state, "nieuwe-categorie", org ~ "/categorieen", "", "Nieuwe categorie", "Toevoegen", editing == "nieuwe-categorie") }}
   </div>
 
   {% for c in categories %}
   {% set anchor = "categorie-" ~ c.id %}
-  {% set base = "/categorieen/" ~ c.id %}
+  {% set base = org ~ "/categorieen/" ~ c.id %}
   {% set cat_used = c.subcategories | selectattr("id", "in", used_subcategory_ids) | list %}
   <article id="{{ anchor }}" class="cat-card{% if not c.is_active %} is-inactive{% endif %}">
     {{ row(state, "cat-" ~ c.id, c.name, c.is_active, base, "Naam van de categorie", anchor, "h2", not cat_used) }}
