@@ -1,10 +1,10 @@
 -r requirements.txt
 -r requirements-ai.txt
-pytest==9.1.1
+pytest==9.2.0
 pytest-cov==7.1.0
 httpx==0.28.1
-black==26.5.1
+black==26.10.1
 isort==9.0.2
-flake8==7.4.1
+flake8==7.5.0
 robotframework==7.5
 robotframework-requests==0.9.7
