@@ -12,7 +12,8 @@ WORKDIR /src
 RUN git clone --quiet --depth 1 --branch "v${LITESTREAM_VERSION}" \
         https://github.com/benbjohnson/litestream.git . \
     && test "$(git rev-parse HEAD)" = "$LITESTREAM_COMMIT"
-RUN go get golang.org/x/crypto@v0.57.0 golang.org/x/net@v0.60.0 google.golang.org/grpc@v1.84.0 \
+RUN go get golang.org/x/crypto@v0.58.0 golang.org/x/net@v0.62.0 google.golang.org/grpc@v1.84.0 \
+        github.com/go-jose/go-jose/v4@v4.1.6 github.com/klauspost/compress@v1.18.7 \
     && go mod tidy \
     && CGO_ENABLED=0 GOOS=linux GOARCH="${TARGETARCH:-amd64}" go build -trimpath \
         -ldflags "-s -w -X main.Version=${LITESTREAM_VERSION}" -o /out/litestream ./cmd/litestream
