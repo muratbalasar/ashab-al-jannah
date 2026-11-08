@@ -47,6 +47,49 @@ Feature: Donaties registreren (US02) – tests/functional/03_donaties.robot
     Then wordt de donatie afgewezen met de melding "Kies een bestaand lid"
 
 
+Feature: Categorieën beheren (US02, ondersteunend) – tests/functional/07_categoriebeheer.robot
+
+  Scenario: Beheerder maakt een categorie met subcategorie aan
+    When de beheerder een categorie "Testfonds" met subcategorie "Testdoel" aanmaakt
+    Then bestaat de categorie "Testfonds" met subcategorie "Testdoel"
+    And staan de categorie en subcategorie op "actief"
+
+  Scenario: Dubbele categorienaam wordt geweigerd
+    Given er bestaat een categorie "Dubbele Categorie"
+    When de beheerder nogmaals een categorie "Dubbele Categorie" probeert aan te maken
+    Then wordt de categorie geweigerd met de melding "bestaat al"
+
+  Scenario: Dubbele subcategorienaam binnen dezelfde categorie wordt geweigerd
+    Given er bestaat een categorie "Unieke Categorie" met subcategorie "Unieke Sub"
+    When de beheerder nogmaals een subcategorie "Unieke Sub" in diezelfde categorie probeert aan te maken
+    Then wordt de subcategorie geweigerd met de melding "bestaat al"
+
+  Scenario: Subcategorie hernoemen
+    Given er bestaat een categorie "Hernoem Categorie" met subcategorie "Oude Naam"
+    When de beheerder de subcategorie hernoemt naar "Nieuwe Naam"
+    Then heet de subcategorie "Nieuwe Naam"
+
+  Scenario: Gedeactiveerde subcategorie kan niet meer gebruikt worden bij nieuwe donaties
+    Given lid "Jan Jansen" bestaat
+    And er bestaat een categorie "Deactivatie Categorie" met subcategorie "Deactivatie Sub"
+    When de beheerder de subcategorie deactiveert
+    And de penningmeester een donatie probeert te registreren in die subcategorie
+    Then wordt de donatie afgewezen met de melding "Kies een geldige categorie en subcategorie"
+
+  Scenario: Subcategorie die al gebruikt is bij een donatie kan niet verwijderd worden
+    Given lid "Jan Jansen" bestaat
+    And er bestaat een categorie "Verwijder Categorie" met subcategorie "Verwijder Sub"
+    And de penningmeester registreert een donatie in die subcategorie
+    When de beheerder de subcategorie probeert te verwijderen
+    Then wordt het verwijderen geweigerd met de melding "al gebruikt bij donaties"
+    And bestaat de subcategorie nog steeds
+
+  Scenario: Ongebruikte subcategorie kan worden verwijderd
+    Given er bestaat een categorie "Opruim Categorie" met subcategorie "Opruim Sub"
+    When de beheerder de subcategorie verwijdert
+    Then bestaat de subcategorie niet meer
+
+
 Feature: Rapportage per periode, per lid en met filters (US04, US05, US06) – tests/functional/04_rapportage.robot
 
   Scenario: Rapportage filtert op inclusieve periode

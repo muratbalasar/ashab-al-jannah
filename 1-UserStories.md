@@ -8,7 +8,7 @@ en het ontwerp voor meerdere stichtingen in [`3-MultiTenantOntwerp.md`](./3-Mult
 | Story | Status | Geautomatiseerde tests |
 |---|---|---|
 | US01 Leden beheren | Gebouwd | `02_ledenbeheer.robot`, `test_member_service.py` |
-| US02 Donaties registreren | Gebouwd | `03_donaties.robot`, `test_donation_service.py` |
+| US02 Donaties registreren | Gebouwd | `03_donaties.robot`, `07_categoriebeheer.robot`, `test_donation_service.py`, `test_category_service.py` |
 | US03 Alle apparaten | Gebouwd (handmatig gecontroleerd) | `test_web.py` |
 | US04–US06 Rapportage en filters | Gebouwd | `04_rapportage.robot`, `test_report_service.py` |
 | US07 AI-inzicht | Gebouwd (lokale provider standaard) | `05_ai_analyse.robot`, `test_insight_service.py` |

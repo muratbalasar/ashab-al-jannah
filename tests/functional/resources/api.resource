@@ -36,6 +36,20 @@ Maak lid aan
     ...    expected_status=201
     RETURN    ${resp.json()}
 
+Maak categorie aan
+    [Arguments]    ${naam}
+    ${body}=    Create Dictionary    name=${naam}
+    ${resp}=    POST On Session    api    ${API}/categories    json=${body}    headers=${BEHEERDER}
+    ...    expected_status=201
+    RETURN    ${resp.json()}
+
+Maak subcategorie aan
+    [Arguments]    ${categorie_id}    ${naam}
+    ${body}=    Create Dictionary    name=${naam}
+    ${resp}=    POST On Session    api    ${API}/categories/${categorie_id}/subcategories    json=${body}
+    ...    headers=${BEHEERDER}    expected_status=201
+    RETURN    ${resp.json()}
+
 Categorie-id van
     [Arguments]    ${categorie}
     ${resp}=    GET On Session    api    ${API}/categories    expected_status=200
