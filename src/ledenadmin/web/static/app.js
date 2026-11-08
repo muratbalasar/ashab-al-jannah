@@ -4,6 +4,38 @@
   const euro = new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" });
   const charts = new Map();
 
+  // Hoofdmenu (hamburger op mobiel): de knop opent/sluit het uitklappaneel; Escape,
+  // een klik buiten het menu of een klik op een menulink sluit het weer.
+  function setNavOpen(panel, open) {
+    panel.classList.toggle("is-open", open);
+    panel.querySelector(".nav-toggle").setAttribute("aria-expanded", String(open));
+  }
+
+  document.addEventListener("click", function (event) {
+    const toggle = event.target.closest(".nav-toggle");
+    const openPanel = document.querySelector(".nav-panel.is-open");
+    if (toggle) {
+      setNavOpen(toggle.closest(".nav-panel"), !toggle.closest(".nav-panel").classList.contains("is-open"));
+      return;
+    }
+    if (!openPanel) return;
+    if (event.target.closest("#hoofdmenu-paneel a") || !openPanel.contains(event.target)) {
+      setNavOpen(openPanel, false);
+    }
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    const panel = document.querySelector(".nav-panel.is-open");
+    if (!panel) return;
+    setNavOpen(panel, false);
+    panel.querySelector(".nav-toggle").focus();
+  });
+
+  window.addEventListener("pageshow", function () {
+    document.querySelectorAll(".nav-panel.is-open").forEach((panel) => setNavOpen(panel, false));
+  });
+
   function renderCharts(root) {
     if (typeof Chart === "undefined") return;
     root.querySelectorAll("canvas[data-chart]").forEach(function (canvas) {
