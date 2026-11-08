@@ -93,6 +93,139 @@
   color: var(--pico-primary-inverse);
   background: var(--pico-primary);
 }
+
+/* ── Hamburgermenu (mobile-first: dichtgeklapt totdat er genoeg ruimte is) ── */
+.nav-panel {
+  display: flex;
+  align-items: center;
+}
+.nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--pico-color);
+  background: transparent;
+  cursor: pointer;
+}
+.nav-toggle:hover,
+.nav-toggle:focus-visible {
+  background: var(--pico-primary-focus);
+}
+.nav-toggle-icon,
+.nav-toggle-icon::before,
+.nav-toggle-icon::after {
+  display: block;
+  width: 1.3rem;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+.nav-toggle-icon {
+  position: relative;
+}
+.nav-toggle-icon::before,
+.nav-toggle-icon::after {
+  content: "";
+  position: absolute;
+  left: 0;
+}
+.nav-toggle-icon::before {
+  top: -0.4rem;
+}
+.nav-toggle-icon::after {
+  top: 0.4rem;
+}
+.nav-panel.is-open .nav-toggle-icon {
+  background: transparent;
+}
+.nav-panel.is-open .nav-toggle-icon::before {
+  top: 0;
+  transform: rotate(45deg);
+}
+.nav-panel.is-open .nav-toggle-icon::after {
+  top: 0;
+  transform: rotate(-45deg);
+}
+
+.nav-panel-body {
+  display: none;
+}
+.nav-panel.is-open .nav-panel-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1.25rem;
+  background: var(--pico-background-color);
+  border-bottom: 1px solid var(--pico-muted-border-color);
+  box-shadow: 0 16px 28px -16px rgba(0, 0, 0, 0.3);
+  /* 100% = hoogte van .topbar (de containing block); zo vult het paneel precies de ruimte tot de onderkant van het scherm. */
+  max-height: calc(100vh - 100%);
+  overflow-y: auto;
+}
+.nav-panel.is-open .nav-links,
+.nav-panel.is-open .nav-session {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+.nav-panel.is-open .nav-links a {
+  display: block;
+  padding: 0.75rem 1rem;
+}
+.nav-panel.is-open .session {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .nav-toggle {
+    display: none;
+  }
+  .nav-panel-body,
+  .nav-panel.is-open .nav-panel-body {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1 1 auto;
+    position: static;
+    gap: 0.5rem 1rem;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    max-height: none;
+    overflow: visible;
+  }
+  .nav-panel .nav-links,
+  .nav-panel .nav-session {
+    flex-direction: row;
+    align-items: center;
+    width: auto;
+  }
+  .nav-panel .nav-links a {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+  }
+  .nav-panel .session {
+    width: auto;
+  }
+}
+
 .session {
   display: inline-flex;
   align-items: center;
