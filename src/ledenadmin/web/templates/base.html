@@ -8,6 +8,7 @@
   <title>{% block title %}{{ app_name }} – {{ app_tagline }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='vendor/pico.min.css') }}?v={{ asset_version('vendor/pico.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}?v={{ asset_version('app.css') }}">
+  <noscript><style>.nav-toggle{display:none}.nav-panel-body{display:flex!important;position:static!important;flex-direction:row!important;flex-wrap:wrap!important;max-height:none!important;box-shadow:none!important;border:0!important;background:none!important;padding:0!important}</style></noscript>
   <script src="{{ url_for('static', path='vendor/htmx.min.js') }}?v={{ asset_version('vendor/htmx.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='vendor/chart.umd.min.js') }}?v={{ asset_version('vendor/chart.umd.min.js') }}" defer></script>
   <script src="{{ url_for('static', path='app.js') }}?v={{ asset_version('app.js') }}" defer></script>
@@ -32,29 +33,38 @@
         </li>
       </ul>
       {% if principal %}
-      <ul class="nav-links">
-        {% if org and principal.member_id %}{{ item(org ~ '/mijn', 'Mijn omgeving') }}{% endif %}
-        {% if principal.can(Permission.MEMBERS_READ) %}{{ item(org ~ '/leden', 'Leden') }}{% endif %}
-        {% if principal.can(Permission.DONATIONS_READ) %}{{ item(org ~ '/donaties', 'Donaties') }}{% endif %}
-        {% if principal.can(Permission.REPORTS_READ) %}{{ item(org ~ '/rapportage', 'Rapportage') }}{% endif %}
-        {% if principal.can(Permission.CATEGORIES_WRITE) %}{{ item(org ~ '/categorieen', 'Categorieën') }}{% endif %}
-        {% if principal.can(Permission.AUDIT_READ) %}{{ item(org ~ '/logboek', 'Logboek') }}{% endif %}
-        {% if org and principal.can(Permission.USERS_MANAGE) %}{{ item(org ~ '/gebruikers', 'Gebruikers') }}{% endif %}
-        {% if org and principal.can(Permission.ORGANIZATION_MANAGE) %}{{ item(org ~ '/instellingen', 'Instellingen') }}{% endif %}
-        {% if principal.is_superadmin %}{{ item('/platform', 'Platform') }}{% endif %}
-        {% if org and assistant_enabled %}{{ item(org ~ '/assistent', 'Assistent') }}{% endif %}
-        {% if org %}{{ item(org ~ '/help', 'Help') }}{% endif %}
-      </ul>
-      <ul>
-        <li class="session" title="Aangemeld als {{ principal.name }}{% if organization %} bij {{ organization.name }}{% endif %}">
-          <span class="avatar" aria-hidden="true">{{ principal.name[:1] | upper }}</span>
-          <span class="session-meta">
-            <span class="session-user">{{ principal.name }}</span>
-            {% if organization %}<span class="session-org"><span class="k">org</span>/{{ organization.slug }}</span>{% endif %}
-          </span>
-          {% if local_mode %}<a href="/dev/gebruiker?terug={{ path | urlencode }}" class="env-badge" title="Lokale ontwikkelmodus: klik om van gebruiker te wisselen">dev</a>{% endif %}
-        </li>
-      </ul>
+      <div class="nav-panel">
+        <button type="button" class="nav-toggle" aria-expanded="false" aria-controls="hoofdmenu-paneel"
+                aria-label="Menu openen of sluiten" title="Menu">
+          <span class="nav-toggle-icon" aria-hidden="true"></span>
+          <span class="visually-hidden">Menu</span>
+        </button>
+        <div class="nav-panel-body" id="hoofdmenu-paneel">
+          <ul class="nav-links">
+            {% if org and principal.member_id %}{{ item(org ~ '/mijn', 'Mijn omgeving') }}{% endif %}
+            {% if principal.can(Permission.MEMBERS_READ) %}{{ item(org ~ '/leden', 'Leden') }}{% endif %}
+            {% if principal.can(Permission.DONATIONS_READ) %}{{ item(org ~ '/donaties', 'Donaties') }}{% endif %}
+            {% if principal.can(Permission.REPORTS_READ) %}{{ item(org ~ '/rapportage', 'Rapportage') }}{% endif %}
+            {% if principal.can(Permission.CATEGORIES_WRITE) %}{{ item(org ~ '/categorieen', 'Categorieën') }}{% endif %}
+            {% if principal.can(Permission.AUDIT_READ) %}{{ item(org ~ '/logboek', 'Logboek') }}{% endif %}
+            {% if org and principal.can(Permission.USERS_MANAGE) %}{{ item(org ~ '/gebruikers', 'Gebruikers') }}{% endif %}
+            {% if org and principal.can(Permission.ORGANIZATION_MANAGE) %}{{ item(org ~ '/instellingen', 'Instellingen') }}{% endif %}
+            {% if principal.is_superadmin %}{{ item('/platform', 'Platform') }}{% endif %}
+            {% if org and assistant_enabled %}{{ item(org ~ '/assistent', 'Assistent') }}{% endif %}
+            {% if org %}{{ item(org ~ '/help', 'Help') }}{% endif %}
+          </ul>
+          <ul class="nav-session">
+            <li class="session" title="Aangemeld als {{ principal.name }}{% if organization %} bij {{ organization.name }}{% endif %}">
+              <span class="avatar" aria-hidden="true">{{ principal.name[:1] | upper }}</span>
+              <span class="session-meta">
+                <span class="session-user">{{ principal.name }}</span>
+                {% if organization %}<span class="session-org"><span class="k">org</span>/{{ organization.slug }}</span>{% endif %}
+              </span>
+              {% if local_mode %}<a href="/dev/gebruiker?terug={{ path | urlencode }}" class="env-badge" title="Lokale ontwikkelmodus: klik om van gebruiker te wisselen">dev</a>{% endif %}
+            </li>
+          </ul>
+        </div>
+      </div>
       {% endif %}
     </nav>
   </header>
