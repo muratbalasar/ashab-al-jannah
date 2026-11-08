@@ -292,6 +292,24 @@ def test_rows_show_names_and_open_one_edit_form_on_request(client) -> None:
     assert f'id="cat-{sponsoring}-naam"' in editing and "autofocus" in editing
 
 
+def test_category_forms_stay_within_the_organization(client) -> None:
+    """Regressietest: alle formulieren op de categorieënpagina (nieuwe categorie, status
+    wijzigen, verwijderen, subcategorie bewerken) moeten binnen "/o/<org>/" blijven. Eerder
+    miste de template de org-prefix, waardoor opslaan/status/verwijderen een 405 gaf omdat
+    de request op een niet-org-gescopeerd pad belandde (zie bugfix hamburger/categorieën)."""
+    sponsoring = category_id(client, "Sponsoring")
+    overview = client.get("/o/standaard/categorieen", headers=BEHEERDER).text
+    editing = client.get(
+        f"/o/standaard/categorieen?bewerk=cat-{sponsoring}",
+        headers={**BEHEERDER, "HX-Request": "true"},
+    ).text
+
+    actions = re.findall(r'(?:action|hx-post|hx-get)="([^"]+)"', overview + editing)
+    assert actions, "geen formulieren/links gevonden om te controleren"
+    for action in actions:
+        assert action.startswith("/o/standaard/"), action
+
+
 def test_htmx_actions_return_only_the_management_block(csrf_client) -> None:
     sponsoring = category_id(csrf_client, "Sponsoring")
     htmx = {**BEHEERDER, "HX-Request": "true", "X-CSRF-Token": csrf_client.csrf}
