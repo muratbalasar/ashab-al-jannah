@@ -100,6 +100,10 @@
   align-items: center;
 }
 .nav-toggle {
+  /* Pico herdefinieert --pico-color op <button> naar wit (voor tekst op een gevulde
+     knop); expliciet overschrijven, anders wordt het hamburgericoon wit-op-wit. */
+  --pico-background-color: transparent;
+  --pico-color: var(--pico-primary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -115,7 +119,12 @@
 }
 .nav-toggle:hover,
 .nav-toggle:focus-visible {
+  /* Pico's eigen button:hover-regel herdefinieert --pico-color ook, met een hogere
+     specificiteit dan een gewone .nav-toggle-regel; hier opnieuw overschrijven. */
+  --pico-background-color: var(--pico-primary-focus);
+  --pico-color: var(--pico-primary-hover);
   background: var(--pico-primary-focus);
+  color: var(--pico-color);
 }
 .nav-toggle-icon,
 .nav-toggle-icon::before,
